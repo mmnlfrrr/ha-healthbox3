@@ -98,10 +98,9 @@ taking that on, please open a GitHub issue to discuss it.
 
 Or manually:
 
-1. In HACS, add this repository as a custom repository (category:
-   Integration).
-2. Install "Renson Healthbox 3".
-3. Restart Home Assistant.
+1. In HACS, search for "Renson Healthbox 3" and install it (it's part
+   of the default HACS store, no need to add a custom repository).
+2. Restart Home Assistant.
 
 ### Manual
 
