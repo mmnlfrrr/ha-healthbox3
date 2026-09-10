@@ -11,6 +11,7 @@ from .api import Healthbox3ApiClient, Healthbox3ConnectionError, Healthbox3Error
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
 
 PLATFORMS = [
+    Platform.BINARY_SENSOR,
     Platform.FAN,
     Platform.NUMBER,
     Platform.SELECT,

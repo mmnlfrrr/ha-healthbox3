@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import override
 
@@ -10,12 +11,30 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import EntityCategory, PERCENTAGE, UnitOfRatio, UnitOfTemperature
+from homeassistant.const import (
+    EntityCategory,
+    PERCENTAGE,
+    REVOLUTIONS_PER_MINUTE,
+    UnitOfElectricPotential,
+    UnitOfPower,
+    UnitOfPressure,
+    UnitOfRatio,
+    UnitOfTemperature,
+    UnitOfVolumeFlowRate,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api import AQI_QUALIFICATION_LEVELS, Room, Sensor, categorize_aqi_quality
+from .api import (
+    AQI_QUALIFICATION_LEVELS,
+    DeviceTelemetry,
+    Room,
+    Sensor,
+    categorize_aqi_quality,
+    room_valve_port,
+)
 from .const import (
+    CONDUCTANCE_UNIT,
     SENSOR_TYPE_AQI,
     SENSOR_TYPE_CO2,
     SENSOR_TYPE_GLOBAL_AQI,
@@ -156,6 +175,106 @@ def _room_airflow_percentage(room: Room) -> float | None:
     return flow_rate / nominal * 100
 
 
+@dataclass(frozen=True, kw_only=True)
+class DeviceSensorMeta:
+    """Presentation metadata for one `/v1/device` telemetry reading.
+
+    `value_fn` pulls the reading out of a parsed DeviceTelemetry; returning
+    None means "this reading isn't currently available", which takes the
+    entity unavailable rather than raising.
+    """
+
+    translation_key: str
+    value_fn: Callable[[DeviceTelemetry], float | None]
+    device_class: SensorDeviceClass | None
+    native_unit_of_measurement: str | None
+    suggested_display_precision: int
+    entity_category: EntityCategory | None = None
+
+
+# Power first: it's the reason most people want this endpoint at all (see
+# README's Energy dashboard section). Both power figures are surfaced
+# rather than one derived from the other - see DeviceTelemetry's docstring
+# on why the fan-only and whole-device numbers are kept distinct.
+DEVICE_SENSOR_META: tuple[DeviceSensorMeta, ...] = (
+    DeviceSensorMeta(
+        translation_key="device_power",
+        value_fn=lambda device: device.power,
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        suggested_display_precision=1,
+    ),
+    DeviceSensorMeta(
+        translation_key="fan_power",
+        value_fn=lambda device: device.fan.power,
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        suggested_display_precision=1,
+    ),
+    DeviceSensorMeta(
+        translation_key="fan_airflow",
+        value_fn=lambda device: device.fan.flow,
+        device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
+        native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
+        suggested_display_precision=0,
+    ),
+    DeviceSensorMeta(
+        translation_key="fan_speed",
+        value_fn=lambda device: device.fan.rpm,
+        device_class=None,
+        native_unit_of_measurement=REVOLUTIONS_PER_MINUTE,
+        suggested_display_precision=0,
+    ),
+    DeviceSensorMeta(
+        translation_key="network_pressure",
+        value_fn=lambda device: device.pressure_total,
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.PA,
+        suggested_display_precision=1,
+    ),
+    DeviceSensorMeta(
+        translation_key="fan_voltage",
+        value_fn=lambda device: device.fan.voltage,
+        device_class=SensorDeviceClass.VOLTAGE,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    DeviceSensorMeta(
+        translation_key="fan_pressure",
+        value_fn=lambda device: device.fan.pressure,
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.PA,
+        suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    DeviceSensorMeta(
+        translation_key="exhaust_pressure",
+        value_fn=lambda device: device.pressure_exhaust,
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.PA,
+        suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    DeviceSensorMeta(
+        translation_key="outlet_conductance",
+        value_fn=lambda device: device.conductance_out,
+        device_class=None,
+        native_unit_of_measurement=CONDUCTANCE_UNIT,
+        suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    DeviceSensorMeta(
+        translation_key="network_leak",
+        value_fn=lambda device: device.conductance_leak,
+        device_class=None,
+        native_unit_of_measurement=CONDUCTANCE_UNIT,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: Healthbox3ConfigEntry,
@@ -182,15 +301,40 @@ async def async_setup_entry(
             entities.append(
                 Healthbox3RoomAirflowSensor(coordinator, serial, room.id, room.name)
             )
+        if _room_current_flow_rate(room) is not None:
+            entities.append(
+                Healthbox3RoomAirflowRateSensor(coordinator, serial, room.id, room.name)
+            )
+        if _room_nominal_flow(room) is not None:
+            entities.append(
+                Healthbox3RoomNominalAirflowSensor(
+                    coordinator, serial, room.id, room.name
+                )
+            )
+        # The duct model is keyed by collector port, so a room without a
+        # valve parameter simply has no per-room pressure/conductance to
+        # show - not an error, just a room these two entities skip.
+        if room_valve_port(room) is not None:
+            entities.append(
+                Healthbox3RoomValvePressureSensor(coordinator, serial, room.id, room.name)
+            )
+            entities.append(
+                Healthbox3RoomConductanceSensor(coordinator, serial, room.id, room.name)
+            )
 
     if any(s.type == SENSOR_TYPE_GLOBAL_AQI for s in coordinator.data.healthbox.global_sensors):
         entities.append(Healthbox3GlobalAqiSensor(coordinator, serial))
         entities.append(Healthbox3GlobalAqiLevelSensor(coordinator, serial))
 
     if coordinator.use_v2:
+        entities.append(Healthbox3WifiStatusSensor(coordinator, serial))
         entities.append(Healthbox3GlobalVentilationLevelSensor(coordinator, serial))
         entities.append(Healthbox3FirmwareVersionSensor(coordinator, serial))
         entities.append(Healthbox3DeviceErrorsSensor(coordinator, serial))
+        entities.extend(
+            Healthbox3DeviceSensor(coordinator, serial, meta)
+            for meta in DEVICE_SENSOR_META
+        )
 
     async_add_entities(entities)
 
@@ -620,3 +764,233 @@ class Healthbox3DeviceErrorsSensor(Healthbox3Entity, SensorEntity):
             "time": latest.time,
             "category": latest.category,
         }
+
+
+class Healthbox3DeviceSensor(Healthbox3Entity, SensorEntity):
+    """One device-wide telemetry reading from `/v1/device`.
+
+    Table-driven (see DEVICE_SENSOR_META) rather than one class per
+    reading: every one of these is the same "pull a float off the parsed
+    telemetry" shape, differing only in presentation.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: Healthbox3DataUpdateCoordinator,
+        serial: str,
+        meta: DeviceSensorMeta,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, serial)
+        self._meta = meta
+        self._attr_translation_key = meta.translation_key
+        self._attr_device_class = meta.device_class
+        self._attr_native_unit_of_measurement = meta.native_unit_of_measurement
+        self._attr_suggested_display_precision = meta.suggested_display_precision
+        self._attr_entity_category = meta.entity_category
+        self._attr_unique_id = f"{serial}_{meta.translation_key}"
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Return whether this reading is currently being reported."""
+        return super().available and self.native_value is not None
+
+    @property
+    @override
+    def native_value(self) -> float | None:
+        """Return this sensor's reading from the latest telemetry."""
+        device = self.coordinator.data.device
+        return self._meta.value_fn(device) if device is not None else None
+
+
+class _Healthbox3RoomValueSensor(Healthbox3Entity, SensorEntity):
+    """Base for per-room sensors that read one number for their room.
+
+    Subclasses implement `_room_value`; everything else (finding the room,
+    availability, naming) is shared.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _unique_id_suffix: str
+
+    def __init__(
+        self,
+        coordinator: Healthbox3DataUpdateCoordinator,
+        serial: str,
+        room_id: int,
+        room_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, serial)
+        self._room_id = room_id
+        self._attr_translation_placeholders = {"room_name": room_name}
+        self._attr_unique_id = f"{serial}_room{room_id}_{self._unique_id_suffix}"
+
+    def _find_room(self) -> Room | None:
+        return next(
+            (r for r in self.coordinator.data.healthbox.rooms if r.id == self._room_id),
+            None,
+        )
+
+    def _room_value(self, room: Room) -> float | None:
+        raise NotImplementedError
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Return whether this room currently reports this value."""
+        return super().available and self.native_value is not None
+
+    @property
+    @override
+    def native_value(self) -> float | None:
+        """Return the value for this room, if reported."""
+        room = self._find_room()
+        return self._room_value(room) if room is not None else None
+
+
+class Healthbox3RoomAirflowRateSensor(_Healthbox3RoomValueSensor):
+    """A room's current airflow in m3/h.
+
+    The absolute counterpart to the existing airflow sensor's percentage
+    of nominal: needed to total or compare real extracted volumes, which
+    a ratio can't express.
+    """
+
+    _attr_translation_key = "room_airflow_rate"
+    _attr_device_class = SensorDeviceClass.VOLUME_FLOW_RATE
+    _attr_native_unit_of_measurement = UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR
+    _attr_suggested_display_precision = 1
+    _unique_id_suffix = "airflow_rate"
+
+    @override
+    def _room_value(self, room: Room) -> float | None:
+        return _room_current_flow_rate(room)
+
+
+class Healthbox3RoomNominalAirflowSensor(_Healthbox3RoomValueSensor):
+    """A room's nominal (rated reference) airflow in m3/h.
+
+    Diagnostic: it's a commissioning constant, not a live reading, but
+    without it the percentage airflow sensor can't be turned back into an
+    absolute target.
+    """
+
+    _attr_translation_key = "room_nominal_airflow"
+    _attr_device_class = SensorDeviceClass.VOLUME_FLOW_RATE
+    _attr_native_unit_of_measurement = UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR
+    _attr_suggested_display_precision = 0
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _unique_id_suffix = "nominal_airflow"
+
+    @override
+    def _room_value(self, room: Room) -> float | None:
+        return _room_nominal_flow(room)
+
+
+class _Healthbox3RoomDuctSensor(_Healthbox3RoomValueSensor):
+    """Base for per-room readings that live in `/v1/device`'s duct model.
+
+    Those blocks are keyed by collector port, so each lookup goes room ->
+    valve port -> value; a room whose port isn't present in the model
+    (not yet calibrated) reports None rather than raising.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def _duct_value(self, port: int, device: DeviceTelemetry) -> float | None:
+        raise NotImplementedError
+
+    @override
+    def _room_value(self, room: Room) -> float | None:
+        device = self.coordinator.data.device
+        port = room_valve_port(room)
+        if device is None or port is None:
+            return None
+        return self._duct_value(port, device)
+
+
+class Healthbox3RoomValvePressureSensor(_Healthbox3RoomDuctSensor):
+    """The differential pressure across a room's valve, in Pa.
+
+    A room needing markedly more pressure than its neighbours for the
+    same flow has a longer, narrower or more restricted duct - useful
+    context when its airflow looks low.
+    """
+
+    _attr_translation_key = "room_valve_pressure"
+    _attr_device_class = SensorDeviceClass.PRESSURE
+    _attr_native_unit_of_measurement = UnitOfPressure.PA
+    _attr_suggested_display_precision = 1
+    _unique_id_suffix = "valve_pressure"
+
+    @override
+    def _duct_value(self, port: int, device: DeviceTelemetry) -> float | None:
+        return device.valve_pressure.get(port)
+
+
+class Healthbox3RoomConductanceSensor(_Healthbox3RoomDuctSensor):
+    """A room's duct conductance, the C in the solver's Q = C x sqrt(dP).
+
+    A property of the duct itself (length, diameter, bends), so it stays
+    put across profile and mode changes - which is what makes a sustained
+    downward drift meaningful: a duct or valve slowly fouling up. Single
+    readings are noisy (a recalibration alone moves it by a few percent),
+    so it's worth a trend over weeks, not a threshold alarm.
+    """
+
+    _attr_translation_key = "room_conductance"
+    _attr_native_unit_of_measurement = CONDUCTANCE_UNIT
+    _attr_suggested_display_precision = 2
+    _unique_id_suffix = "conductance"
+
+    @override
+    def _duct_value(self, port: int, device: DeviceTelemetry) -> float | None:
+        return device.valve_conductance.get(port)
+
+
+class Healthbox3WifiStatusSensor(Healthbox3Entity, SensorEntity):
+    """The device's Wi-Fi client status, e.g. "connected".
+
+    Reports the Wi-Fi radio's own state, which is not the same as the
+    device being reachable: a unit wired over Ethernet answers this
+    endpoint with a non-connected status while working perfectly. The
+    SSID is carried as an attribute rather than its own entity - it's
+    context for this state, not a reading that changes on its own.
+    """
+
+    _attr_translation_key = "wifi_status"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self, coordinator: Healthbox3DataUpdateCoordinator, serial: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, serial)
+        self._attr_unique_id = f"{serial}_wifi_status"
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Return whether the device's Wi-Fi status is known."""
+        wifi = self.coordinator.data.wifi
+        return super().available and wifi is not None and wifi.status is not None
+
+    @property
+    @override
+    def native_value(self) -> str | None:
+        """Return the reported Wi-Fi client status."""
+        wifi = self.coordinator.data.wifi
+        return wifi.status if wifi is not None else None
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, str | None] | None:
+        """Return the SSID and any reported connection error."""
+        wifi = self.coordinator.data.wifi
+        if wifi is None:
+            return None
+        return {"ssid": wifi.ssid, "connection_error": wifi.connection_error}

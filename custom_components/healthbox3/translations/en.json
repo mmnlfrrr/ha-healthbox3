@@ -58,6 +58,17 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "device_problem": {
+        "name": "Problem"
+      },
+      "advanced_api": {
+        "name": "Advanced API access"
+      },
+      "internet_connection": {
+        "name": "Internet connection"
+      }
+    },
     "sensor": {
       "room_temperature": {
         "name": "{room_name} Temperature"
@@ -130,6 +141,51 @@
       },
       "device_errors": {
         "name": "Device errors"
+      },
+      "device_power": {
+        "name": "Power"
+      },
+      "fan_power": {
+        "name": "Fan power"
+      },
+      "fan_airflow": {
+        "name": "Fan airflow"
+      },
+      "fan_speed": {
+        "name": "Fan speed"
+      },
+      "network_pressure": {
+        "name": "Duct network pressure"
+      },
+      "fan_voltage": {
+        "name": "Fan voltage"
+      },
+      "fan_pressure": {
+        "name": "Fan pressure"
+      },
+      "exhaust_pressure": {
+        "name": "Exhaust pressure"
+      },
+      "outlet_conductance": {
+        "name": "Outlet conductance"
+      },
+      "network_leak": {
+        "name": "Network leakage"
+      },
+      "room_airflow_rate": {
+        "name": "{room_name} Airflow rate"
+      },
+      "room_nominal_airflow": {
+        "name": "{room_name} Nominal airflow"
+      },
+      "room_valve_pressure": {
+        "name": "{room_name} Valve pressure"
+      },
+      "room_conductance": {
+        "name": "{room_name} Duct conductance"
+      },
+      "wifi_status": {
+        "name": "Wi-Fi status"
       }
     },
     "select": {

@@ -19,6 +19,7 @@ from .api import (
     BreezeSettings,
     DeviceDecision,
     DeviceError,
+    DeviceTelemetry,
     Healthbox3ApiClient,
     Healthbox3AuthenticationError,
     Healthbox3ConnectionError,
@@ -26,6 +27,7 @@ from .api import (
     Healthbox3InvalidResponseError,
     HealthboxData,
     RoomDecision,
+    WifiStatus,
     async_discover_broadcast,
 )
 from .const import (
@@ -68,6 +70,8 @@ class Healthbox3Data:
     room_decisions: dict[int, RoomDecision] = field(default_factory=dict)
     firmware_version: str | None = None
     errors: list[DeviceError] = field(default_factory=list)
+    device: DeviceTelemetry | None = None
+    wifi: WifiStatus | None = None
 
 
 @dataclass
@@ -150,6 +154,8 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         room_decisions = await self._async_get_room_decisions_data()
         firmware_version = await self._async_get_firmware_version_data()
         errors = await self._async_get_errors_data()
+        device = await self._async_get_device_data()
+        wifi = await self._async_get_wifi_data()
         self._async_reconcile_error_issues(errors)
         return Healthbox3Data(
             healthbox=healthbox,
@@ -159,6 +165,8 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             room_decisions=room_decisions,
             firmware_version=firmware_version,
             errors=errors,
+            device=device,
+            wifi=wifi,
         )
 
     async def _async_get_decision_data(self) -> DeviceDecision | None:
@@ -225,6 +233,35 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         except Healthbox3Error as err:
             _LOGGER.debug("Failed to fetch device errors: %s", err)
             return []
+
+    async def _async_get_device_data(self) -> DeviceTelemetry | None:
+        """Fetch `/v1/device` - same gating/tolerance as decision.
+
+        Gated on `use_v2` for consistency with every other
+        reverse-engineered endpoint here (see const.py's API_V1_DECISION
+        comment): it has only ever been probed against a device with an
+        active API key, so it isn't assumed key-independent just because
+        it's "v1"-prefixed.
+        """
+        if not self.use_v2:
+            return None
+        try:
+            return await self.client.async_get_device()
+        except Healthbox3Error as err:
+            _LOGGER.debug("Failed to fetch device telemetry: %s", err)
+            return None
+
+    async def _async_get_wifi_data(self) -> WifiStatus | None:
+        """Fetch `/renson_core/v1/wifi/client/status` - same gating/tolerance
+        as device telemetry above.
+        """
+        if not self.use_v2:
+            return None
+        try:
+            return await self.client.async_get_wifi_status()
+        except Healthbox3Error as err:
+            _LOGGER.debug("Failed to fetch Wi-Fi status: %s", err)
+            return None
 
     def _async_reconcile_error_issues(self, errors: list[DeviceError]) -> None:
         """Create a repair issue for each currently-reported device error,

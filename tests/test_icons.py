@@ -13,22 +13,33 @@ import json
 from pathlib import Path
 
 from custom_components.healthbox3.const import PROFILES
-from custom_components.healthbox3.sensor import ROOM_SENSOR_META
+from custom_components.healthbox3.sensor import DEVICE_SENSOR_META, ROOM_SENSOR_META
 
 ICONS_PATH = (
     Path(__file__).parent.parent / "custom_components" / "healthbox3" / "icons.json"
 )
 
 # Fixed translation_keys not derived from a shared data structure (see
-# sensor.py/select.py/fan.py/switch.py/number.py/time.py - none of these
-# platforms expose an importable list of their entities' translation_keys,
-# unlike sensor.py's ROOM_SENSOR_META).
+# sensor.py/select.py/fan.py/switch.py/number.py/time.py/binary_sensor.py -
+# none of these platforms expose an importable list of their entities'
+# translation_keys, unlike sensor.py's ROOM_SENSOR_META and
+# DEVICE_SENSOR_META).
 EXTRA_SENSOR_KEYS = {
     "room_airflow",
+    "room_airflow_rate",
+    "room_nominal_airflow",
+    "room_valve_pressure",
+    "room_conductance",
     "global_aqi",
     "global_ventilation_level",
     "firmware_version",
     "device_errors",
+    "wifi_status",
+}
+BINARY_SENSOR_KEYS = {
+    "device_problem",
+    "advanced_api",
+    "internet_connection",
 }
 SELECT_KEYS = {"room_profile"}
 FAN_KEYS = {"room_boost", "boost_all"}
@@ -53,9 +64,18 @@ def test_icons_json_is_valid_json():
 
 
 def test_sensor_icons_cover_every_translation_key():
-    expected = {meta.translation_key for meta in ROOM_SENSOR_META.values()} | EXTRA_SENSOR_KEYS
+    expected = (
+        {meta.translation_key for meta in ROOM_SENSOR_META.values()}
+        | {meta.translation_key for meta in DEVICE_SENSOR_META}
+        | EXTRA_SENSOR_KEYS
+    )
     actual = set(_load_icons()["entity"]["sensor"])
     assert actual == expected
+
+
+def test_binary_sensor_icons_cover_every_translation_key():
+    actual = set(_load_icons()["entity"]["binary_sensor"])
+    assert actual == BINARY_SENSOR_KEYS
 
 
 def test_select_icons_cover_every_translation_key():

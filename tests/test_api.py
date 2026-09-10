@@ -824,3 +824,135 @@ async def test_broadcast_discovery_protocol_error_received_does_not_raise():
     protocol = api_mod._BroadcastDiscoveryProtocol()
 
     protocol.error_received(OSError("boom"))  # must not raise
+
+
+async def test_get_device_parses_real_fixture(v1_device_raw):
+    """Every field of a real /v1/device response is read back correctly."""
+    session = _FakeSession([_FakeResponse(200, json.dumps(v1_device_raw))])
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    device = await client.async_get_device()
+
+    assert device.fan.power == pytest.approx(6.2013056807)
+    assert device.fan.rpm == 570.0
+    assert device.fan.voltage == pytest.approx(3.36)
+    assert device.fan.flow == pytest.approx(151.2005690344)
+    assert device.fan.pressure == pytest.approx(31.4086103698)
+    assert device.power == pytest.approx(11.2413056807)
+    assert device.pressure_total == pytest.approx(61.7595832219)
+    assert device.pressure_exhaust == pytest.approx(27.5602313830)
+    assert device.conductance_out == pytest.approx(43.8113268601)
+    assert device.conductance_leak == pytest.approx(0.5940844877)
+    # All seven collector ports are modelled on real hardware.
+    assert set(device.valve_conductance) == set(range(1, 8))
+    assert set(device.valve_pressure) == set(range(1, 8))
+    assert device.valve_conductance[1] == pytest.approx(5.1299410471)
+    assert device.valve_pressure[1] == pytest.approx(34.1993518389)
+
+
+async def test_get_device_whole_device_power_exceeds_fan_power(v1_device_raw):
+    """The two power figures are distinct readings, not the same number.
+
+    Guards the assumption the sensors are built on (see DeviceTelemetry's
+    docstring): if these ever collapse to one value, exposing both stops
+    making sense.
+    """
+    session = _FakeSession([_FakeResponse(200, json.dumps(v1_device_raw))])
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    device = await client.async_get_device()
+
+    assert device.power is not None and device.fan.power is not None
+    assert device.power > device.fan.power
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {},
+        {"fan": None, "conductance": None, "cmode_pressures": None},
+        {"fan": {}, "conductance": {}, "cmode_pressures": {}},
+    ],
+)
+async def test_get_device_tolerates_missing_blocks(raw):
+    """A response missing blocks yields "nothing reported", not an error."""
+    session = _FakeSession([_FakeResponse(200, json.dumps(raw))])
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    device = await client.async_get_device()
+
+    assert device.power is None
+    assert device.fan.rpm is None
+    assert device.valve_conductance == {}
+    assert device.valve_pressure == {}
+
+
+async def test_get_device_skips_unusable_readings():
+    """Non-numeric values and non-integer port keys are skipped, not fatal.
+
+    Booleans specifically: `isinstance(True, int)` is True in Python, so a
+    stray boolean would otherwise silently become 1.0.
+    """
+    raw = {
+        "power": True,
+        "fan": {"rpm": "570", "power": 6.0},
+        "conductance": {"c_collector": {"1": {"c_ij": {"0": 5.0}}, "x": {"c_ij": {"0": 9.0}}}},
+        "cmode_pressures": {"p_collector": {"2": {"0": None}}},
+    }
+    session = _FakeSession([_FakeResponse(200, json.dumps(raw))])
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    device = await client.async_get_device()
+
+    assert device.power is None
+    assert device.fan.rpm is None
+    assert device.fan.power == 6.0
+    assert device.valve_conductance == {1: 5.0}
+    assert device.valve_pressure == {}
+
+
+async def test_get_wifi_status_parses_real_fixture(wifi_status_raw):
+    session = _FakeSession([_FakeResponse(200, json.dumps(wifi_status_raw))])
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    wifi = await client.async_get_wifi_status()
+
+    assert wifi.status == "connected"
+    assert wifi.internet_connection is True
+    assert wifi.ssid == "REDACTED"
+    # The device uses "" for "no error", which is not a reportable value.
+    assert wifi.connection_error is None
+
+
+async def test_get_wifi_status_treats_empty_strings_as_absent():
+    raw = {"status": "", "ssid": "", "internet_connection": None, "connection_error": ""}
+    session = _FakeSession([_FakeResponse(200, json.dumps(raw))])
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    wifi = await client.async_get_wifi_status()
+
+    assert wifi.status is None
+    assert wifi.ssid is None
+    assert wifi.internet_connection is None
+
+
+def test_room_valve_port_reads_the_collector_join_key(v2_data):
+    """Rooms carry their collector port as a string; it must come back int.
+
+    That port is what joins a room to /v1/device's per-valve conductance
+    and pressure blocks, which aren't keyed by room id.
+    """
+    room = next(r for r in v2_data.rooms if r.id == 1)
+
+    assert api_mod.room_valve_port(room) == 1
+
+
+def test_room_valve_port_returns_none_when_unusable():
+    def room(**parameters):
+        return api_mod.Room(id=9, name="x", type="y", parameters=parameters)
+
+    assert api_mod.room_valve_port(room()) is None
+    assert api_mod.room_valve_port(room(valve=api_mod.Parameter(value="abc"))) is None
+    assert api_mod.room_valve_port(room(valve=api_mod.Parameter(value=None))) is None
+    # Booleans are ints in Python; a True valve must not become port 1.
+    assert api_mod.room_valve_port(room(valve=api_mod.Parameter(value=True))) is None

@@ -211,6 +211,24 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `Ventilation level` | Whole-house current ventilation level, as a percentage; not capped at 100% - requires an active API key |
 | `sensor` | `Firmware version` | The device's currently installed firmware version - diagnostic entity, requires an active API key |
 | `sensor` | `Device errors` | Count of currently-active device-reported errors, plus the most recent one's details as attributes - diagnostic entity, requires an active API key; each active error also creates a repair issue (**Settings > Repairs**) |
+| `sensor` | `Power` | Whole-device electrical power draw - requires an active API key; see [Energy dashboard](#energy-dashboard) |
+| `sensor` | `Fan power` | The fan's own power draw, lower than `Power` - requires an active API key |
+| `sensor` | `Fan airflow` | Total airflow through the fan, m³/h - requires an active API key |
+| `sensor` | `Fan speed` | Fan speed in rpm - requires an active API key |
+| `sensor` | `Duct network pressure` | Total pressure across the duct network, Pa - requires an active API key |
+| `sensor` | `Fan voltage` | Fan supply voltage - diagnostic entity, requires an active API key |
+| `sensor` | `Fan pressure` | Pressure measured at the fan, Pa - diagnostic entity, requires an active API key |
+| `sensor` | `Exhaust pressure` | Pressure at the exhaust, Pa - diagnostic entity, requires an active API key |
+| `sensor` | `Outlet conductance` | The duct model's outlet conductance - diagnostic entity, requires an active API key |
+| `sensor` | `Network leakage` | The duct model's estimated leakage conductance - diagnostic entity, requires an active API key; see [Duct model](#duct-model) |
+| `sensor` | `<room> Airflow rate` | That room's current airflow in m³/h (the absolute counterpart to `<room> Airflow`'s percentage) |
+| `sensor` | `<room> Nominal airflow` | That room's rated reference airflow in m³/h - diagnostic entity |
+| `sensor` | `<room> Valve pressure` | Differential pressure across that room's valve, Pa - diagnostic entity, requires an active API key |
+| `sensor` | `<room> Duct conductance` | That room's duct conductance - diagnostic entity, requires an active API key; see [Duct model](#duct-model) |
+| `sensor` | `Wi-Fi status` | The device's Wi-Fi client status, with SSID as an attribute - diagnostic entity, requires an active API key |
+| `binary_sensor` | `Problem` | On while the device reports any error - the boolean companion to `Device errors`, requires an active API key |
+| `binary_sensor` | `Advanced API access` | Whether privileged (v2) access is currently working - diagnostic entity, always created |
+| `binary_sensor` | `Internet connection` | Whether the device reports internet access - diagnostic entity, requires an active API key |
 | `select` | `<room> Profile` | eco/health/intense - only created with an active API key |
 | `fan` | `<room> Boost` | Boost for that room - see "Boost control" below |
 | `fan` | `Boost all` | Boost for every room at once, at one shared level/duration - on only when every room currently reports boost enabled |
@@ -227,6 +245,44 @@ All entities for a given Healthbox unit are grouped under a single device
 (named after the device's own description, e.g. "Healthbox 3.0" - rename it
 in the UI if you'd like something more specific, like "Basement
 Healthbox").
+
+### Energy dashboard
+
+The `Power` sensor makes the unit's consumption available to Home
+Assistant's **Energy dashboard**, which is worth doing: a Healthbox runs
+continuously, so even a handful of watts adds up over a year.
+
+The dashboard needs energy (kWh), not power (W), so add a Riemann-sum
+helper once:
+
+1. **Settings > Devices & services > Helpers > Create helper > Integral
+   sensor**
+2. Input sensor: the Healthbox `Power` sensor
+3. Integration method: **Left Riemann sum** (or Trapezoidal), metric
+   prefix **k**, time unit **h**
+4. **Settings > Dashboards > Energy > Individual devices > Add device**,
+   and pick the helper you just created
+
+Use `Power` rather than `Fan power`: the fan-only figure leaves out the
+electronics' own draw and will under-report. On the reference hardware the
+two read 6.2 W and 11.2 W respectively at the same moment.
+
+### Duct model
+
+The device continuously calibrates a physical model of your ducting,
+`Q = C x sqrt(dP)`, and this integration surfaces it: `<room> Duct
+conductance` per room, plus `Outlet conductance` and `Network leakage` for
+the network as a whole.
+
+Conductance is a property of the duct itself - its length, diameter and
+bends - so it stays put across profile and mode changes. That's what makes
+it useful: a **sustained** downward drift in one room's conductance means
+that duct or its valve is slowly fouling up, visible long before airflow
+drops enough to notice.
+
+Read it as a trend over weeks, not as a threshold. Individual readings are
+noisy: recalibrating alone moves conductance by a few percent and pressure
+by rather more, so a single step means nothing on its own.
 
 ### Boost control
 
