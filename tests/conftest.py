@@ -188,6 +188,30 @@ def device_errors(errors_raw) -> list[api_mod.DeviceError]:
 
 
 @pytest.fixture
+def v1_device_raw() -> dict:
+    """Raw JSON from a real device's /v1/device."""
+    return _load_fixture("v1-device.json")
+
+
+@pytest.fixture
+def device_telemetry(v1_device_raw) -> api_mod.DeviceTelemetry:
+    """Parsed device telemetry from the /v1/device fixture."""
+    return api_mod._parse_device(v1_device_raw)
+
+
+@pytest.fixture
+def wifi_status_raw() -> dict:
+    """Raw JSON from a real device's /renson_core/v1/wifi/client/status."""
+    return _load_fixture("wifi-client-status.json")
+
+
+@pytest.fixture
+def wifi_status(wifi_status_raw) -> api_mod.WifiStatus:
+    """Parsed Wi-Fi status from the Wi-Fi fixture."""
+    return api_mod._parse_wifi(wifi_status_raw)
+
+
+@pytest.fixture
 def mock_api_client():
     """Patch the API client used by __init__.py's async_setup_entry.
 
@@ -212,6 +236,13 @@ def mock_api_client():
     ) as mock_cls:
         client = mock_cls.return_value
         client.async_get_room_decisions = AsyncMock(return_value={})
+        # Same autospec quirk as async_get_room_decisions above: left
+        # unconfigured these return an AsyncMock, not None, which the
+        # coordinator would happily store as real telemetry - every
+        # /v1/device-backed entity would then read attributes off a mock
+        # and report one as its state. Default them to "not reported".
+        client.async_get_device = AsyncMock(return_value=None)
+        client.async_get_wifi_status = AsyncMock(return_value=None)
         yield client
 
 
@@ -240,6 +271,8 @@ async def setup_integration(
     room_decisions: dict[int, api_mod.RoomDecision] | None = None,
     firmware_version: str | None = None,
     errors: list[api_mod.DeviceError] | None = None,
+    device: api_mod.DeviceTelemetry | None = None,
+    wifi: api_mod.WifiStatus | None = None,
 ) -> MockConfigEntry:
     """Create a config entry and run async_setup_entry against a mocked client.
 
@@ -282,6 +315,10 @@ async def setup_integration(
         )
     if errors is not None:
         mock_api_client.async_get_errors = AsyncMock(return_value=errors)
+    if device is not None:
+        mock_api_client.async_get_device = AsyncMock(return_value=device)
+    if wifi is not None:
+        mock_api_client.async_get_wifi_status = AsyncMock(return_value=wifi)
 
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()

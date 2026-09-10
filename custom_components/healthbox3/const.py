@@ -101,6 +101,37 @@ API_RENSON_CORE_V2_GLOBAL = "/renson_core/v2/global"
 # action, see coordinator.py's issue-reconciliation docstring.
 API_V1_ERROR = "/v1/error"
 
+# Same undocumented/reverse-engineered status as API_V1_DECISION above.
+# Carries the device's live electrical and aeraulic telemetry: fan
+# voltage/pressure/flow/power/rpm, a whole-device power figure, and the
+# calibrated duct model the device's own solver maintains (per-valve
+# conductances and pressures). Confirmed shape against real hardware, see
+# docs/fixtures/v1-device.json.
+API_V1_DEVICE = "/v1/device"
+
+# Same undocumented/reverse-engineered status as API_V1_DECISION above.
+# Confirmed shape from docs/fixtures/wifi-client-status.json.
+API_RENSON_CORE_V1_WIFI_STATUS = "/renson_core/v1/wifi/client/status"
+
+# /v1/device keys its per-valve conductance and pressure blocks by the
+# collector PORT number, not by room id - this room parameter is the join
+# key between the two endpoints. Reported as a string on the wire (e.g.
+# "1"), hence the int() coercion at the parse site.
+ROOM_PARAM_VALVE = "valve"
+
+# Both blocks nest their actual value one level deeper under a "0" key
+# (conductance.c_collector.<port>.c_ij.0, cmode_pressures.p_collector.
+# <port>.0). Confirmed on real hardware for all 7 ports; no port has ever
+# been observed with a key other than "0", but nothing documents what a
+# second entry would mean, so only "0" is read.
+COLLECTOR_PRIMARY_KEY = "0"
+
+# Conductance C as used by the device's own solver in Q = C x sqrt(dP),
+# with Q in m3/h and dP in Pa. Home Assistant has no unit for this, and no
+# SensorDeviceClass fits, so it's a display-only label on a
+# device_class-less sensor rather than anything HA will try to convert.
+CONDUCTANCE_UNIT = "m³/(h·√Pa)"
+
 API_KEY_STATE_VALID = "valid"
 API_KEY_STATE_EMPTY = "empty"
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
 import logging
@@ -12,10 +13,12 @@ import aiohttp
 
 from .const import (
     API_KEY_STATE_VALID,
+    API_RENSON_CORE_V1_WIFI_STATUS,
     API_RENSON_CORE_V2_GLOBAL,
     API_V1_BOOST,
     API_V1_DATA_CURRENT,
     API_V1_DECISION,
+    API_V1_DEVICE,
     API_V1_ERROR,
     API_V2_API_KEY,
     API_V2_API_KEY_STATUS,
@@ -23,10 +26,12 @@ from .const import (
     API_V2_DECISION_BREEZE,
     API_V2_DECISION_ROOM,
     API_V2_PROFILE_NAME,
+    COLLECTOR_PRIMARY_KEY,
     DISCOVERY_MESSAGE,
     DISCOVERY_PORT,
     DISCOVERY_TIMEOUT,
     PROFILES,
+    ROOM_PARAM_VALVE,
     SILENT_WEEKDAYS,
 )
 
@@ -387,6 +392,164 @@ def _parse_errors(raw: list[dict[str, Any]]) -> list[DeviceError]:
         )
         for e in raw
     ]
+
+
+@dataclass
+class FanTelemetry:
+    """The fan's own live readings, from `/v1/device`'s `fan` block.
+
+    Every field is optional: the block is present on all firmware seen so
+    far, but an individual reading going missing is treated as "that one
+    sensor is unavailable" rather than an error, matching how room
+    sensors are handled elsewhere in this module.
+    """
+
+    voltage: float | None = None
+    pressure: float | None = None
+    flow: float | None = None
+    power: float | None = None
+    rpm: float | None = None
+
+
+@dataclass
+class DeviceTelemetry:
+    """Parsed result of `/v1/device`.
+
+    Two distinct power figures are reported and they are NOT the same
+    number: `fan.power` is the fan alone, while the top-level `power` is
+    higher and tracks it (6.20 W vs 11.24 W in
+    docs/fixtures/v1-device.json). The obvious reading is that the
+    top-level figure is the whole appliance and the difference is the
+    electronics' own baseline draw, but no Renson document confirms that
+    composition, so both are surfaced separately and left for the user to
+    interpret rather than one being derived from the other.
+
+    `c_mode_power` is deliberately not exposed: it only has a meaningful
+    value while the device is running its calibration sweep, so as a
+    permanently-present entity it would read as a misleading constant.
+
+    `conductance` and `pressures` hold the device's calibrated duct model
+    (see README): conductance C in the solver's Q = C x sqrt(dP). Both are
+    keyed by collector PORT number, not room id - see ROOM_PARAM_VALVE.
+    """
+
+    fan: FanTelemetry = field(default_factory=FanTelemetry)
+    power: float | None = None
+    conductance_out: float | None = None
+    conductance_leak: float | None = None
+    pressure_total: float | None = None
+    pressure_exhaust: float | None = None
+    valve_conductance: dict[int, float] = field(default_factory=dict)
+    valve_pressure: dict[int, float] = field(default_factory=dict)
+
+
+def _optional_float(value: Any) -> float | None:
+    """Return `value` as a float, or None if it isn't a usable number.
+
+    Booleans are rejected explicitly: `isinstance(True, int)` is True in
+    Python, and a stray boolean silently becoming 1.0 would be worse than
+    the reading simply going unavailable.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _parse_collector_block(
+    raw: Any, extract: Callable[[Any], Any]
+) -> dict[int, float]:
+    """Parse one of `/v1/device`'s per-valve blocks into {port: value}.
+
+    Ports whose value is missing, non-numeric, or whose key isn't an
+    integer are skipped rather than raising: an unbuilt or uncalibrated
+    port is a normal state, not a malformed response.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    parsed: dict[int, float] = {}
+    for port, entry in raw.items():
+        try:
+            port_number = int(port)
+        except (TypeError, ValueError):
+            continue
+        value = _optional_float(extract(entry))
+        if value is not None:
+            parsed[port_number] = value
+    return parsed
+
+
+def _parse_device(raw: dict[str, Any]) -> DeviceTelemetry:
+    fan = raw.get("fan") or {}
+    conductance = raw.get("conductance") or {}
+    pressures = raw.get("cmode_pressures") or {}
+    return DeviceTelemetry(
+        fan=FanTelemetry(
+            voltage=_optional_float(fan.get("voltage")),
+            pressure=_optional_float(fan.get("pressure")),
+            flow=_optional_float(fan.get("flow")),
+            power=_optional_float(fan.get("power")),
+            rpm=_optional_float(fan.get("rpm")),
+        ),
+        power=_optional_float(raw.get("power")),
+        conductance_out=_optional_float(conductance.get("c_out")),
+        conductance_leak=_optional_float(conductance.get("c_leak")),
+        pressure_total=_optional_float(pressures.get("p_tot")),
+        pressure_exhaust=_optional_float(pressures.get("p_exh")),
+        valve_conductance=_parse_collector_block(
+            conductance.get("c_collector"),
+            lambda entry: (entry or {}).get("c_ij", {}).get(COLLECTOR_PRIMARY_KEY),
+        ),
+        valve_pressure=_parse_collector_block(
+            pressures.get("p_collector"),
+            lambda entry: (entry or {}).get(COLLECTOR_PRIMARY_KEY),
+        ),
+    )
+
+
+@dataclass
+class WifiStatus:
+    """Parsed result of `/renson_core/v1/wifi/client/status`.
+
+    A device wired over Ethernet still answers this endpoint, reporting a
+    non-connected status - so "not connected" here means "not on Wi-Fi",
+    which is not the same as "offline".
+    """
+
+    status: str | None = None
+    ssid: str | None = None
+    internet_connection: bool | None = None
+    connection_error: str | None = None
+
+
+def _optional_str(value: Any) -> str | None:
+    """Return a non-empty string, or None. The device uses "" for absent."""
+    return value if isinstance(value, str) and value else None
+
+
+def _parse_wifi(raw: dict[str, Any]) -> WifiStatus:
+    internet = raw.get("internet_connection")
+    return WifiStatus(
+        status=_optional_str(raw.get("status")),
+        ssid=_optional_str(raw.get("ssid")),
+        internet_connection=internet if isinstance(internet, bool) else None,
+        connection_error=_optional_str(raw.get("connection_error")),
+    )
+
+
+def room_valve_port(room: Room) -> int | None:
+    """Return the collector port a room's valve is wired to, if reported.
+
+    Reported as a string on the wire (e.g. "1"); rooms without a valve
+    parameter, or with a non-numeric one, return None so callers can skip
+    them rather than guess.
+    """
+    parameter = room.parameters.get(ROOM_PARAM_VALVE)
+    if parameter is None or isinstance(parameter.value, bool):
+        return None
+    try:
+        return int(parameter.value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
 
 
 # AQI qualification bands, per Renson's own official reply (via their
@@ -770,6 +933,26 @@ class Healthbox3ApiClient:
         except (KeyError, TypeError, AttributeError) as err:
             raise Healthbox3InvalidResponseError(
                 "Unexpected v2 data/current response shape"
+            ) from err
+
+    async def async_get_device(self) -> DeviceTelemetry:
+        """Fetch and parse `/v1/device`."""
+        raw = await self._request("GET", API_V1_DEVICE)
+        try:
+            return _parse_device(raw)
+        except (KeyError, TypeError, AttributeError) as err:
+            raise Healthbox3InvalidResponseError(
+                "Unexpected device response shape"
+            ) from err
+
+    async def async_get_wifi_status(self) -> WifiStatus:
+        """Fetch and parse `/renson_core/v1/wifi/client/status`."""
+        raw = await self._request("GET", API_RENSON_CORE_V1_WIFI_STATUS)
+        try:
+            return _parse_wifi(raw)
+        except (KeyError, TypeError, AttributeError) as err:
+            raise Healthbox3InvalidResponseError(
+                "Unexpected Wi-Fi status response shape"
             ) from err
 
     async def async_get_boost(self, room_id: int) -> BoostStatus:
