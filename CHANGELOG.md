@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Electrical power sensors (`Power` for the whole device, `Fan power` for
+  the fan alone). Both are real, distinct device readings - the fan-only
+  figure is the lower of the two, so the whole-device one is what belongs
+  in the Energy dashboard. See
+  [Energy dashboard](README.md#energy-dashboard) for the one Riemann-sum
+  helper that turns it into kWh.
+- Fan telemetry sensors: `Fan airflow` (m³/h), `Fan speed` (rpm), plus
+  `Fan voltage` and `Fan pressure` as diagnostics.
+- Duct network sensors: `Duct network pressure`, `Exhaust pressure`,
+  `Outlet conductance` and `Network leakage`, plus per-room
+  `<room> Valve pressure` and `<room> Duct conductance`. Together these
+  expose the physical duct model (`Q = C x sqrt(dP)`) the device
+  calibrates for itself; a sustained drop in a room's conductance is an
+  early sign of a duct or valve fouling up. See
+  [Duct model](README.md#duct-model).
+- `<room> Airflow rate` and `<room> Nominal airflow`, both in m³/h. The
+  existing `<room> Airflow` reports a percentage of nominal, which can't
+  be summed or compared as a real extracted volume.
+- New `binary_sensor` platform: `Problem` (the boolean companion to the
+  existing `Device errors` count, for automations), `Internet connection`,
+  and `Advanced API access` - the last one is created even without a
+  working API key, since reporting that privileged access is *off* is the
+  whole point of it. Losing that access is otherwise silent, and its
+  symptom (every per-room air-quality entity going unavailable while the
+  device looks healthy) is easy to misread.
+- `Wi-Fi status` diagnostic sensor, carrying the SSID as an attribute.
+
+All of the above read `/v1/device` and
+`/renson_core/v1/wifi/client/status`, neither of which was previously
+called. Like every other reverse-engineered endpoint here, both are gated
+on an active API key.
+
 ## [0.3.3] - 2026-07-14
 
 ### Added
