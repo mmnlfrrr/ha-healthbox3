@@ -173,7 +173,7 @@
         "name": "Fuite du réseau"
       },
       "room_airflow_rate": {
-        "name": "{room_name} Débit d'air"
+        "name": "{room_name} Débit mesuré"
       },
       "room_nominal_airflow": {
         "name": "{room_name} Débit nominal"
