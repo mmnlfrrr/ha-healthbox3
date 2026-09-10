@@ -58,6 +58,17 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "device_problem": {
+        "name": "Probleem"
+      },
+      "advanced_api": {
+        "name": "Geavanceerde API-toegang"
+      },
+      "internet_connection": {
+        "name": "Internetverbinding"
+      }
+    },
     "sensor": {
       "room_temperature": {
         "name": "{room_name} Temperatuur"
@@ -130,6 +141,51 @@
       },
       "device_errors": {
         "name": "Apparaatfouten"
+      },
+      "device_power": {
+        "name": "Vermogen"
+      },
+      "fan_power": {
+        "name": "Ventilatorvermogen"
+      },
+      "fan_airflow": {
+        "name": "Ventilatordebiet"
+      },
+      "fan_speed": {
+        "name": "Ventilatortoerental"
+      },
+      "network_pressure": {
+        "name": "Kanaalnetwerkdruk"
+      },
+      "fan_voltage": {
+        "name": "Ventilatorspanning"
+      },
+      "fan_pressure": {
+        "name": "Ventilatordruk"
+      },
+      "exhaust_pressure": {
+        "name": "Uitlaatdruk"
+      },
+      "outlet_conductance": {
+        "name": "Uitlaatconductantie"
+      },
+      "network_leak": {
+        "name": "Netwerklekkage"
+      },
+      "room_airflow_rate": {
+        "name": "{room_name} Luchtdebiet"
+      },
+      "room_nominal_airflow": {
+        "name": "{room_name} Nominaal luchtdebiet"
+      },
+      "room_valve_pressure": {
+        "name": "{room_name} Klepdruk"
+      },
+      "room_conductance": {
+        "name": "{room_name} Kanaalconductantie"
+      },
+      "wifi_status": {
+        "name": "Wifi-status"
       }
     },
     "select": {

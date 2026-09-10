@@ -1,5 +1,16 @@
 {
   "entity": {
+    "binary_sensor": {
+      "device_problem": {
+        "default": "mdi:alert-circle"
+      },
+      "advanced_api": {
+        "default": "mdi:key"
+      },
+      "internet_connection": {
+        "default": "mdi:web"
+      }
+    },
     "sensor": {
       "room_temperature": {
         "default": "mdi:thermometer"
@@ -30,6 +41,51 @@
       },
       "device_errors": {
         "default": "mdi:alert-circle"
+      },
+      "device_power": {
+        "default": "mdi:flash"
+      },
+      "fan_power": {
+        "default": "mdi:lightning-bolt"
+      },
+      "fan_airflow": {
+        "default": "mdi:fan"
+      },
+      "fan_speed": {
+        "default": "mdi:speedometer"
+      },
+      "network_pressure": {
+        "default": "mdi:gauge-full"
+      },
+      "fan_voltage": {
+        "default": "mdi:sine-wave"
+      },
+      "fan_pressure": {
+        "default": "mdi:gauge"
+      },
+      "exhaust_pressure": {
+        "default": "mdi:gauge-low"
+      },
+      "outlet_conductance": {
+        "default": "mdi:pipe"
+      },
+      "network_leak": {
+        "default": "mdi:pipe-leak"
+      },
+      "room_airflow_rate": {
+        "default": "mdi:weather-windy"
+      },
+      "room_nominal_airflow": {
+        "default": "mdi:ruler"
+      },
+      "room_valve_pressure": {
+        "default": "mdi:gauge"
+      },
+      "room_conductance": {
+        "default": "mdi:pipe-valve"
+      },
+      "wifi_status": {
+        "default": "mdi:wifi"
       }
     },
     "select": {

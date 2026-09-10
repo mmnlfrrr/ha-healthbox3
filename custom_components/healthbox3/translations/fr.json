@@ -58,6 +58,17 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "device_problem": {
+        "name": "Problème"
+      },
+      "advanced_api": {
+        "name": "Accès à l'API avancée"
+      },
+      "internet_connection": {
+        "name": "Connexion Internet"
+      }
+    },
     "sensor": {
       "room_temperature": {
         "name": "{room_name} Température"
@@ -130,6 +141,51 @@
       },
       "device_errors": {
         "name": "Erreurs de l'appareil"
+      },
+      "device_power": {
+        "name": "Puissance"
+      },
+      "fan_power": {
+        "name": "Puissance du ventilateur"
+      },
+      "fan_airflow": {
+        "name": "Débit du ventilateur"
+      },
+      "fan_speed": {
+        "name": "Régime du ventilateur"
+      },
+      "network_pressure": {
+        "name": "Pression du réseau de gaines"
+      },
+      "fan_voltage": {
+        "name": "Tension du ventilateur"
+      },
+      "fan_pressure": {
+        "name": "Pression du ventilateur"
+      },
+      "exhaust_pressure": {
+        "name": "Pression de sortie"
+      },
+      "outlet_conductance": {
+        "name": "Conductance de sortie"
+      },
+      "network_leak": {
+        "name": "Fuite du réseau"
+      },
+      "room_airflow_rate": {
+        "name": "{room_name} Débit d'air"
+      },
+      "room_nominal_airflow": {
+        "name": "{room_name} Débit nominal"
+      },
+      "room_valve_pressure": {
+        "name": "{room_name} Pression de la vanne"
+      },
+      "room_conductance": {
+        "name": "{room_name} Conductance de la gaine"
+      },
+      "wifi_status": {
+        "name": "État du Wi-Fi"
       }
     },
     "select": {
