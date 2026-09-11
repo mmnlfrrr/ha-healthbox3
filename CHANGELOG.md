@@ -42,10 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **A Healthbox card**, drawing the unit and its outlets the way the
-  Renson app does: a numbered connection at each wired collector port, a
-  cap everywhere else, and each room's name, airflow and pictogram beside
-  it. Add it from the card picker - the integration serves it, so there is
-  no resource to register by hand.
+  Renson app does: a numbered connection at each wired collector port and
+  a cap everywhere else, with the unit centred. Hovering an outlet shows
+  its room - pictogram, name, airflow, air quality, profile, boost - and
+  clicking it opens that room's more-info. Add it from the card picker;
+  the integration serves it, so there is no resource to register by hand.
 
   Nothing about it is per-install: the integration publishes the real
   topology (which ports carry a room, their names, their entity ids) at
@@ -57,8 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbering (`1.1`, `1.2`, `1.3`), drawn as a chain running away from the
   unit exactly as the Renson installer app draws it, each branch with its
   own connection and its own fault state - on any edge, with the drawing
-  sizing itself to whatever the chains and labels need. The readings move into a hover
-  tooltip so a split port stays legible. An outlet is marked faulty only
+  sizing itself to whatever the chains need. An outlet is marked faulty only
   when a reported error's association id is exactly one of this unit's
   port numbers - `/v1/error` says nothing about what that id identifies,
   so anything else is shown against the unit rather than blamed on a

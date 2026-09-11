@@ -295,9 +295,8 @@ class HealthboxCard extends HTMLElement {
       // which means an integration reload anyway.
       this._layout = "loading";
       hass.callApi("GET", %(layout_url)s).then(
-        async (data) => {
+        (data) => {
           this._layout = data;
-          await this._resolveIcons();
           this._render();
         },
         () => {
@@ -308,25 +307,6 @@ class HealthboxCard extends HTMLElement {
       return;
     }
     if (this._layout !== "loading") this._render();
-  }
-
-  async _resolveIcons() {
-    // The pictograms are already in the browser: the integration serves
-    // them as an icon set for the room symbol entities. Reusing that
-    // costs nothing, and keeps one copy of the artwork.
-    this._icons = {};
-    const sets = window.customIconsets || {};
-    for (const room of (this._unit() || { rooms: [] }).rooms) {
-      const [prefix, name] = String(room.icon || "").replace("custom:", "").split(/-(.*)/);
-      const resolve = sets[prefix];
-      if (!resolve) continue;
-      try {
-        const icon = await resolve(name);
-        if (icon && icon.path) this._icons[room.port] = icon.path;
-      } catch (err) {
-        // An unresolvable pictogram just means no glyph on that room.
-      }
-    }
   }
 
   _fail(message) {
@@ -362,6 +342,7 @@ class HealthboxCard extends HTMLElement {
       byPort.get(room.port).push(room);
     }
 
+    const view = this._viewBox(byPort);
     const parts = [
       `<g transform="translate(${G.exhaust_x},${G.exhaust_y})">${ASSETS.healthbox_exhaust}</g>`,
       `<g transform="translate(${G.base_x},${G.base_y})">${ASSETS.healthbox_base}</g>`,
@@ -379,31 +360,65 @@ class HealthboxCard extends HTMLElement {
     }
 
     for (const [port, rooms] of byPort) {
-      parts.push(this._outlet(port, rooms));
+      parts.push(this._outlet(port, rooms, view));
     }
 
-    if (unit.unattributed_errors) {
-      // Parked in the corner rather than under the unit: down there it
-      // reads as belonging to whichever room's figures it lands beside,
-      // and "not attributable to an outlet" is the whole point of it.
-      parts.push(
-        `<g><title>${unit.unattributed_errors} error(s) not attributable to an outlet</title>` +
-          `<text x="8" y="148" font-size="13" fill="var(--error-color,#db4437)">` +
-          `⚠ ${unit.unattributed_errors}</text></g>`,
-      );
-    }
+    const warn = unit.unattributed_errors
+      ? `<div style="position:absolute;top:4px;left:8px;color:var(--error-color,#db4437)"` +
+        ` title="${unit.unattributed_errors} error(s) not attributable to an outlet">` +
+        `⚠ ${unit.unattributed_errors}</div>`
+      : "";
 
     this.innerHTML =
       `<ha-card header="${unit.name}">` +
-      `<div style="padding:8px 8px 16px;color:var(--primary-text-color)">` +
-      `<svg viewBox="${this._viewBox(byPort)}" style="width:100%%;height:auto">${parts.join("")}</svg>` +
-      `</div></ha-card>`;
+      `<div class="hb3" style="position:relative;padding:8px 8px 16px;` +
+      `color:var(--primary-text-color)">` +
+      `<svg viewBox="${view.join(" ")}" style="width:100%%;height:auto;display:block">` +
+      `${parts.join("")}</svg>${warn}${this._tipElement()}</div></ha-card>`;
 
-    this.querySelectorAll("[data-entity]").forEach((node) => {
+    this._bind(unit);
+  }
+
+  _tipElement() {
+    // An HTML panel rather than an SVG <title>: it has to show the room's
+    // pictogram, which a native tooltip cannot do. Positioned in percent
+    // of the drawing, so no measuring - see _outlet.
+    return (
+      `<div class="hb3-tip" hidden style="position:absolute;z-index:1;` +
+      `transform:translate(-50%%,-115%%);pointer-events:none;white-space:nowrap;` +
+      `display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;` +
+      `background:var(--card-background-color,#fff);color:var(--primary-text-color);` +
+      `box-shadow:var(--ha-card-box-shadow,0 2px 8px rgba(0,0,0,.25));` +
+      `border:1px solid var(--divider-color,rgba(127,127,127,.3));font-size:13px"></div>`
+    );
+  }
+
+  _bind(unit) {
+    const tip = this.querySelector(".hb3-tip");
+
+    this.querySelectorAll("[data-room]").forEach((node) => {
+      const room = unit.rooms[Number(node.dataset.room)];
       node.style.cursor = "pointer";
+
+      const show = () => {
+        tip.innerHTML = this._tipContent(room, node.dataset.label);
+        tip.style.left = `${node.dataset.left}%%`;
+        tip.style.top = `${node.dataset.top}%%`;
+        tip.hidden = false;
+      };
+      const hide = () => {
+        tip.hidden = true;
+      };
+
+      node.addEventListener("mouseenter", show);
+      node.addEventListener("focus", show);
+      node.addEventListener("mouseleave", hide);
+      node.addEventListener("blur", hide);
       node.addEventListener("click", () => {
+        const id = node.dataset.entity;
+        if (!id) return;
         const event = new Event("hass-more-info", { bubbles: true, composed: true });
-        event.detail = { entityId: node.getAttribute("data-entity") };
+        event.detail = { entityId: id };
         this.dispatchEvent(event);
       });
     });
@@ -413,102 +428,87 @@ class HealthboxCard extends HTMLElement {
     // Computed, not fixed: a chain grows the drawing in whichever
     // direction it runs, and a fixed box silently clipped anything on the
     // top or bottom edge - two branches there already overflowed it.
-    // Starts from the casing plus its exhaust, then grows for every chain
-    // and every label actually drawn.
+    //
     // Every port position draws something - a connection or a blanking
     // cap - so one valve depth on each side is always occupied, whether
     // or not a room is wired there. Counting only the wired ones cut the
     // caps off the edges that had none.
-    let minX = G.base_x - G.valve_side_w;
-    let maxX = G.base_x + G.base_size + G.valve_side_w;
-    let minY = Math.min(G.base_y - G.valve_end_h, G.exhaust_y);
-    let maxY = G.base_y + G.base_size + G.valve_end_h;
+    let left = G.valve_side_w;
+    let right = G.valve_side_w;
+    let top = Math.max(G.valve_end_h, G.base_y - G.exhaust_y);
+    let bottom = G.valve_end_h;
 
     for (const [port, rooms] of byPort) {
-      const [side, a] = PORTS[port];
-      const reach = outward(side) * rooms.length;
-      const split = rooms.length > 1;
-      // A label needs room along the axis it runs and across it, and the
-      // two are not the same measure - the first mistake here was
-      // reserving a text *width* above a top outlet, which left a band of
-      // empty space instead.
-      const wide = split
-        ? 14
-        : 26 + this._textWidth(rooms[0].name) + (this._icons?.[port] ? 19 : 0);
-      const tall = split ? 14 : 52;
-
-      if (side === "left") {
-        minX = Math.min(minX, G.base_x - reach - wide);
-      } else if (side === "right") {
-        maxX = Math.max(maxX, G.base_x + G.base_size + reach + wide);
-      } else {
-        // Top and bottom labels are centred on the outlet, so they spread
-        // both ways across the drawing as well as away from it.
-        minX = Math.min(minX, a - wide / 2);
-        maxX = Math.max(maxX, a + wide / 2);
-        if (side === "top") minY = Math.min(minY, G.base_y - reach - tall);
-        else maxY = Math.max(maxY, G.base_y + G.base_size + reach + tall);
-      }
+      const [side] = PORTS[port];
+      const reach = outward(side) * rooms.length + 14; // + the badge
+      if (side === "left") left = Math.max(left, reach);
+      else if (side === "right") right = Math.max(right, reach);
+      else if (side === "top") top = Math.max(top, reach);
+      else bottom = Math.max(bottom, reach);
     }
 
+    // Same margin on opposite sides, so the unit sits in the middle of
+    // the card however lopsided the installation is.
     const margin = 8;
-    minX -= margin;
-    minY -= margin;
-    maxX += margin;
-    maxY += margin;
-    return `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
+    const dx = Math.max(left, right) + margin;
+    const dy = Math.max(top, bottom) + margin;
+    const cx = G.base_x + G.base_size / 2;
+    const cy = G.base_y + G.base_size / 2;
+    const half = G.base_size / 2;
+    return [cx - half - dx, cy - half - dy, (half + dx) * 2, (half + dy) * 2];
   }
 
-  _outlet(port, rooms) {
-    const [side] = PORTS[port];
+  _outlet(port, rooms, view) {
     const split = rooms.length > 1;
 
     return rooms
       .map((room, i) => {
         const [bx, by] = badgeAt(port, i);
         const label = split ? `${port}.${i + 1}` : String(port);
-        const clickable = room.entities.airflow || room.entities.boost || "";
         const colour = room.error ? "var(--error-color,#db4437)" : "currentColor";
+        const index = this._unit().rooms.indexOf(room);
+        // Percent of the viewport: the SVG scales to the card's width and
+        // keeps its aspect, so these map straight onto the rendered box
+        // with nothing to measure at runtime.
+        const left = ((bx - view[0]) / view[2]) * 100;
+        const top = ((by - view[1]) / view[3]) * 100;
 
         return (
-          `<g data-entity="${clickable}">` +
-          `<title>${this._tooltip(room, label)}</title>` +
+          `<g data-room="${index}" data-label="${label}"` +
+          ` data-entity="${room.entities.airflow || room.entities.boost || ""}"` +
+          ` data-left="${left.toFixed(3)}" data-top="${top.toFixed(3)}" tabindex="0">` +
           `<circle cx="${bx}" cy="${by}" r="${split ? 11 : 12}"` +
           ` fill="var(--card-background-color,#fff)" stroke="${colour}" stroke-width="2"/>` +
           `<text x="${bx}" y="${by}" text-anchor="middle" dominant-baseline="central"` +
-          ` font-size="${split ? 11 : 14}" fill="${colour}">${label}</text>` +
-          (split ? "" : this._callout(room, bx, by, side)) +
-          `</g>`
+          ` font-size="${split ? 11 : 14}" fill="${colour}">${label}</text></g>`
         );
       })
       .join("");
   }
 
-  _tooltip(room, label) {
-    // Everything the drawing can no longer afford to show. Kept as an SVG
-    // <title>, so it is the browser's own tooltip: no positioning code to
-    // get wrong, and screen readers announce it.
-    const lines = [`${label} · ${room.name}`];
+  _tipContent(room, label) {
+    const detail = [];
     const flow = this._state(room.entities.airflow);
     const rate = this._state(room.entities.airflow_rate);
     const aqi = this._state(room.entities.aqi_level);
     const profile = this._state(room.entities.profile);
     const boost = this._state(room.entities.boost);
 
-    if (flow || rate) {
-      const parts = [];
-      if (flow) parts.push(`${Math.round(Number(flow.state))}%%`);
-      if (rate) parts.push(`${Math.round(Number(rate.state))} m³/h`);
-      lines.push(parts.join(" · "));
-    }
-    if (aqi) lines.push(this._label(aqi));
-    if (profile) lines.push(this._label(profile));
-    if (boost && boost.state === "on") lines.push("Boost");
-    if (room.error) lines.push("⚠");
-    // Doubled on purpose: this module is a Python string, so a single
-    // backslash-n would become a real line break before the browser
-    // ever sees it, and the JavaScript string would not close.
-    return lines.join("\\n");
+    if (flow) detail.push(`${Math.round(Number(flow.state))}%%`);
+    if (rate) detail.push(`${Math.round(Number(rate.state))} m³/h`);
+    if (aqi) detail.push(this._label(aqi));
+    if (profile) detail.push(this._label(profile));
+    if (boost && boost.state === "on") detail.push("Boost");
+
+    return (
+      `<ha-icon icon="${room.icon}" style="--mdc-icon-size:20px;` +
+      `color:${room.error ? "var(--error-color,#db4437)" : "inherit"}"></ha-icon>` +
+      `<span><b>${label} · ${room.name}</b>` +
+      (detail.length
+        ? `<br><span style="opacity:.7">${detail.join(" · ")}</span>`
+        : "") +
+      `</span>`
+    );
   }
 
   _label(state) {
@@ -518,54 +518,6 @@ class HealthboxCard extends HTMLElement {
     return this._hass.formatEntityState
       ? this._hass.formatEntityState(state)
       : attrs.friendly_name || state.state;
-  }
-
-  _callout(room, cx, cy, side) {
-    const flow = this._state(room.entities.airflow);
-    const rate = this._state(room.entities.airflow_rate);
-    const anchor = side === "left" ? "end" : side === "right" ? "start" : "middle";
-    const dx = side === "left" ? -22 : side === "right" ? 22 : 0;
-    const dy = side === "top" ? -34 : side === "bottom" ? 34 : -4;
-
-    const lines = [`<tspan x="${cx + dx}" font-weight="600">${room.name}</tspan>`];
-    const glyph = this._glyph(room, cx + dx, cy + dy, side);
-    const detail = [];
-    if (flow) detail.push(`${Math.round(Number(flow.state))}%%`);
-    if (rate) detail.push(`${Math.round(Number(rate.state))} m³/h`);
-    if (detail.length)
-      lines.push(
-        `<tspan x="${cx + dx}" dy="14" opacity="0.7">${detail.join(" · ")}</tspan>`,
-      );
-
-    return (
-      `${glyph}<text x="${cx + dx}" y="${cy + dy}" text-anchor="${anchor}" font-size="12"` +
-      ` fill="currentColor">${lines.join("")}</text>`
-    );
-  }
-
-  _glyph(room, x, y, side) {
-    // 24x24 art scaled to 15, always on the far side of the label from
-    // the unit - otherwise it lands on top of the numbered badge.
-    const path = (this._icons || {})[room.port];
-    if (!path) return "";
-    const size = 15;
-    const w = this._textWidth(room.name);
-    const gx =
-      side === "left" ? x - w - size - 4
-      : side === "right" ? x + w + 4
-      : x - w / 2 - size - 4;
-    const gy = y - size + 2;
-    const scale = size / 24;
-    return (
-      `<g transform="translate(${gx},${gy}) scale(${scale})" opacity="0.75">` +
-      `<path d="${path}" fill="currentColor"/></g>`
-    );
-  }
-
-  _textWidth(text) {
-    // No text metrics without a layout pass, and the glyph only needs to
-    // clear the label, so this approximates 12px bold at ~0.58em.
-    return String(text).length * 7;
   }
 }
 

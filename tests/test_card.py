@@ -214,15 +214,46 @@ async def test_a_port_number_that_is_not_wired_is_not_attributed(
     assert unit["unattributed_errors"] == 1
 
 
-def test_card_module_draws_tooltips_and_branch_labels():
-    """The two things that keep a split outlet readable: details move into
-    an SVG <title>, and branches are numbered with Renson's dot notation.
+def test_card_module_draws_branch_labels_and_fault_art():
+    """Branches are numbered with Renson's dot notation, and a faulty one
+    gets the error drawing rather than the plain connection.
     """
     module = build_card_module()
 
-    assert "<title>" in module
     assert "${port}.${i + 1}" in module
     assert "valve_manual_error" in module
+
+
+def test_everything_but_the_number_lives_in_the_hover_panel():
+    """The drawing carries only the badges, so a split outlet stays
+    readable however many branches it has. Name, pictogram and readings
+    are shown on hover.
+
+    An HTML panel rather than an SVG <title>, because a native tooltip
+    cannot draw the room's pictogram.
+    """
+    module = build_card_module()
+
+    assert "hb3-tip" in module
+    assert "<ha-icon" in module
+    assert 'addEventListener("mouseenter"' in module
+    assert 'addEventListener("mouseleave"' in module
+    # Keyboard reachable, and the panel follows focus as well as the mouse.
+    assert 'tabindex="0"' in module
+    assert 'addEventListener("focus"' in module
+
+
+def test_hover_panel_is_positioned_without_measuring_the_dom():
+    """Placement is a percentage of the viewport, which maps exactly onto
+    the rendered drawing because the SVG scales to the card's width and
+    keeps its aspect. Nothing to measure at runtime, so nothing to get
+    wrong on a card that is still laying out.
+    """
+    module = build_card_module()
+
+    assert "((bx - view[0]) / view[2]) * 100" in module
+    assert "((by - view[1]) / view[3]) * 100" in module
+    assert "data-left=" in module and "data-top=" in module
 
 
 def test_card_module_chains_branches_outward():
@@ -255,13 +286,14 @@ def test_card_module_sizes_its_own_viewport():
     """
     module = build_card_module()
 
-    assert 'viewBox="${this._viewBox(byPort)}"' in module
+    assert 'viewBox="${view.join(" ")}"' in module
     # Every position draws something, wired or capped.
     assert "G.base_x - G.valve_side_w" in module
     assert "G.base_y + G.base_size + G.valve_end_h" in module
-    # Along the axis and across it are different measures.
-    assert "const wide = split" in module
-    assert "const tall = split" in module
+    # Opposite sides get the same margin, so the unit sits in the middle
+    # of the card however lopsided the installation is.
+    assert "const dx = Math.max(left, right) + margin" in module
+    assert "const dy = Math.max(top, bottom) + margin" in module
 
 
 def test_layout_is_empty_before_any_unit_is_set_up(hass):
