@@ -526,11 +526,20 @@ restores the rest.
 
 ## Translations
 
-English, Dutch, and French are available (Renson is a Belgian
-manufacturer). **Dutch has been reviewed by a native speaker; French has
-not** - it's a best-effort translation only, and should be treated as
-less polished/trustworthy than the English or Dutch text until a native
-French speaker reviews it. Corrections are very welcome via PR.
+English, Dutch, French, and German are available (Renson is a Belgian
+manufacturer). They are not equally trustworthy, and the difference is
+worth knowing before you rely on a label:
+
+- **Dutch** has been reviewed by a native speaker.
+- **French** has not, but its vocabulary has been checked against the
+  wording of Renson's own French app - the terms a user already reads on
+  their phone. The parts with no counterpart in the app stay best-effort.
+- **German** is best-effort throughout and **has not been checked against
+  Renson's German app**, which was not available: it uses standard German
+  ventilation terminology rather than Renson's own words. Treat every
+  label in it as a candidate for correction.
+
+Corrections are very welcome via PR.
 
 ## Development
 

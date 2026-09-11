@@ -1,0 +1,276 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Ihrer Healthbox 3 verbinden",
+        "description": "Es wurden keine Geräte automatisch gefunden – geben Sie die IP-Adresse oder den Hostnamen Ihrer Renson Healthbox 3 im lokalen Netzwerk ein.",
+        "data": {
+          "host": "Host"
+        }
+      },
+      "discovery_select": {
+        "title": "Healthbox 3 auswählen",
+        "description": "Es wurden mehrere Geräte in Ihrem Netzwerk gefunden. Wählen Sie das Gerät aus, das eingerichtet werden soll.",
+        "data": {
+          "host": "Gerät"
+        }
+      },
+      "discovery_confirm": {
+        "title": "Diese Healthbox 3 einrichten?",
+        "description": "{description} (Seriennummer: {serial}) unter {ip} gefunden."
+      },
+      "api_key": {
+        "title": "Optional: vollständige Sensordaten freischalten",
+        "description": "Ohne API-Schlüssel liest diese Integration nur grundlegende Raum- und Ventildaten und kann den Boost steuern (v1-API). Für Sensoren für Temperatur, Luftfeuchtigkeit, CO2, VOC und Luftqualität sowie für die Steuerung des Lüftungsprofils wenden Sie sich an den Renson-Support und fordern Sie einen API-Schlüssel für dieses Gerät an (Seriennummer: {serial}) – dort werden Seriennummer und Garantienummer verlangt. Sie haben bereits selbst einen Schlüssel direkt am Gerät aktiviert (z. B. über den POST-Befehl aus der Renson-Dokumentation)? Dann können Sie dieses Feld leer lassen – die Aktivierung liegt im Gerät selbst, diese Integration erkennt sie automatisch. Andernfalls lassen Sie das Feld leer, um ohne Schlüssel fortzufahren; Sie können später über „Neu konfigurieren“ einen Schlüssel hinzufügen.",
+        "data": {
+          "api_key": "API-Schlüssel (optional)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Healthbox 3 neu authentifizieren",
+        "description": "Der API-Schlüssel dieser Healthbox 3 ist nicht mehr gültig (von Renson ausgestellte Schlüssel laufen nach einigen Jahren ab). Die Integration arbeitet zwischenzeitlich nur noch mit den v1-Funktionen. Geben Sie einen neuen Schlüssel ein, um den Zugriff auf Sensoren und Profile wiederherzustellen.",
+        "data": {
+          "api_key": "API-Schlüssel"
+        }
+      },
+      "reconfigure": {
+        "title": "Healthbox 3 neu konfigurieren",
+        "description": "IP-Adresse und/oder API-Schlüssel des Geräts aktualisieren. Lassen Sie den API-Schlüssel leer, um den bereits gespeicherten zu behalten – er wird nur geändert, wenn Sie einen neuen eingeben.",
+        "data": {
+          "host": "Host",
+          "api_key": "API-Schlüssel (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum Gerät fehlgeschlagen. Prüfen Sie die IP-Adresse und ob das Gerät in Ihrem Netzwerk erreichbar ist.",
+      "invalid_api_key": "Der API-Schlüssel wurde abgelehnt. Prüfen Sie den Schlüssel und ob er zur Seriennummer bzw. Garantienummer dieses Geräts passt.",
+      "api_key_pending": "Das Gerät prüft diesen Schlüssel noch bei Renson und hat noch nicht geantwortet. Dafür benötigt es Internetzugang. Prüfen Sie die Verbindung des Geräts und versuchen Sie es in einer Minute erneut.",
+      "unknown": "Unerwarteter Fehler"
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits eingerichtet",
+      "cannot_connect": "Verbindung zum Gerät fehlgeschlagen.",
+      "no_matching_entry": "Kein vorhandener Healthbox-3-Eintrag passt zu diesem Gerät.",
+      "reauth_successful": "Die erneute Authentifizierung war erfolgreich",
+      "reconfigure_successful": "Die Neukonfiguration war erfolgreich",
+      "relocated": "Die Verbindungsdaten dieses Geräts wurden automatisch aktualisiert, nachdem es unter einer neuen Netzwerkadresse gefunden wurde.",
+      "unique_id_mismatch": "Diese IP-Adresse gehört zu einer anderen Healthbox 3 als der, die gerade neu konfiguriert wird."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "device_problem": {
+        "name": "Problem"
+      },
+      "advanced_api": {
+        "name": "Erweiterter API-Zugriff"
+      },
+      "internet_connection": {
+        "name": "Internetverbindung"
+      }
+    },
+    "sensor": {
+      "room_temperature": {
+        "name": "Temperatur"
+      },
+      "room_humidity": {
+        "name": "Luftfeuchtigkeit"
+      },
+      "room_co2": {
+        "name": "CO2"
+      },
+      "room_voc": {
+        "name": "VOC"
+      },
+      "room_aqi": {
+        "name": "Luftqualitätsindex",
+        "state_attributes": {
+          "qualification": {
+            "state": {
+              "very_good": "Ausgezeichnet",
+              "good": "Gut",
+              "moderate": "Mittel",
+              "poor": "Schlecht",
+              "very_poor": "Sehr schlecht"
+            }
+          }
+        }
+      },
+      "room_aqi_level": {
+        "name": "AQI-Stufe",
+        "state": {
+          "very_good": "Ausgezeichnet",
+          "good": "Gut",
+          "moderate": "Mittel",
+          "poor": "Schlecht",
+          "very_poor": "Sehr schlecht"
+        }
+      },
+      "room_airflow": {
+        "name": "Luftstrom"
+      },
+      "global_aqi": {
+        "name": "Luftqualitätsindex",
+        "state_attributes": {
+          "qualification": {
+            "state": {
+              "very_good": "Ausgezeichnet",
+              "good": "Gut",
+              "moderate": "Mittel",
+              "poor": "Schlecht",
+              "very_poor": "Sehr schlecht"
+            }
+          }
+        }
+      },
+      "global_aqi_level": {
+        "name": "AQI-Stufe",
+        "state": {
+          "very_good": "Ausgezeichnet",
+          "good": "Gut",
+          "moderate": "Mittel",
+          "poor": "Schlecht",
+          "very_poor": "Sehr schlecht"
+        }
+      },
+      "global_ventilation_level": {
+        "name": "Lüftungsstufe"
+      },
+      "firmware_version": {
+        "name": "Firmware-Version"
+      },
+      "ip_address": {
+        "name": "IP-Adresse"
+      },
+      "mac_address": {
+        "name": "MAC-Adresse"
+      },
+      "connection_type": {
+        "name": "Verbindungstyp"
+      },
+      "device_errors": {
+        "name": "Gerätefehler"
+      },
+      "device_power": {
+        "name": "Leistung"
+      },
+      "fan_power": {
+        "name": "Ventilatorleistung"
+      },
+      "fan_airflow": {
+        "name": "Gesamter Abluftvolumenstrom"
+      },
+      "fan_speed": {
+        "name": "Ventilatordrehzahl"
+      },
+      "network_pressure": {
+        "name": "Kanalnetzdruck"
+      },
+      "fan_voltage": {
+        "name": "Ventilatorspannung"
+      },
+      "fan_pressure": {
+        "name": "Ventilatordruck"
+      },
+      "exhaust_pressure": {
+        "name": "Abluftdruck"
+      },
+      "outlet_conductance": {
+        "name": "Austrittsleitwert"
+      },
+      "network_leak": {
+        "name": "Leckage des Kanalnetzes"
+      },
+      "room_airflow_rate": {
+        "name": "Volumenstrom"
+      },
+      "room_nominal_airflow": {
+        "name": "Nennvolumenstrom"
+      },
+      "room_valve_pressure": {
+        "name": "Ventildruck"
+      },
+      "room_valve_port": {
+        "name": "Ventilanschluss"
+      },
+      "room_legislation_code": {
+        "name": "Vorschriftencode"
+      },
+      "room_symbol": {
+        "name": "Raumsymbol"
+      },
+      "room_conductance": {
+        "name": "Kanalleitwert"
+      },
+      "wifi_status": {
+        "name": "WLAN-Status"
+      },
+      "energy": {
+        "name": "Energie"
+      }
+    },
+    "select": {
+      "room_profile": {
+        "name": "Profil",
+        "state": {
+          "eco": "Eco",
+          "health": "Gesundheit",
+          "intense": "Intensiv"
+        }
+      }
+    },
+    "fan": {
+      "room_boost": {
+        "name": "Boost"
+      },
+      "boost_all": {
+        "name": "Alle boosten"
+      }
+    },
+    "switch": {
+      "demand_control": {
+        "name": "Bedarfsregelung"
+      },
+      "silent": {
+        "name": "Silent"
+      }
+    },
+    "number": {
+      "minimum_ventilation_level": {
+        "name": "Minimale Lüftungsstufe"
+      },
+      "breeze_temperature": {
+        "name": "Breeze-Temperatur"
+      },
+      "room_co2_threshold": {
+        "name": "CO2-Schwellenwert"
+      },
+      "silent_reduction": {
+        "name": "Silent-Absenkung"
+      }
+    },
+    "time": {
+      "silent_start_time": {
+        "name": "Silent-Startzeit"
+      },
+      "silent_stop_time": {
+        "name": "Silent-Endzeit"
+      }
+    }
+  },
+  "exceptions": {
+    "room_not_found": {
+      "message": "Raum {room_id} ist auf diesem Healthbox-Gerät nicht mehr vorhanden."
+    },
+    "boost_partial_failure": {
+      "message": "Boost {action} für folgende Räume fehlgeschlagen: {rooms}."
+    }
+  },
+  "issues": {
+    "device_error": {
+      "title": "Healthbox hat einen {severity} Fehler gemeldet",
+      "description": "Die Healthbox hat einen Fehler der Kategorie {category} gemeldet (Code {code}): {description}\n\nGemeldet um {time}. Er lässt sich nicht aus Home Assistant löschen – verwenden Sie die Renson-App oder das Gerät selbst, um ihn zu quittieren oder zu beheben. Ausführliche Hinweise zur Fehlersuche finden Sie in der Renson-App oder bei Ihrem Installateur. Dieses Problem verschwindet automatisch, sobald das Gerät den Fehler nicht mehr meldet."
+    }
+  }
+}
