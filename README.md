@@ -137,6 +137,12 @@ search "Renson Healthbox 3".
    the demand control/minimum ventilation/Breeze/CO2 threshold/silent
    schedule entities - see below.
 
+### Changing the poll interval
+
+**Settings** → **Devices & Services** → **Renson Healthbox 3** →
+**Configure**. See [Data updates](#data-updates) for what one poll actually
+costs before shortening it.
+
 ### Changing the IP address or API key later
 
 If your Healthbox 3 gets a new IP (e.g. a DHCP reassignment), you usually
@@ -273,6 +279,13 @@ device already says which room. Rename the unit device in the UI if you'd
 like something more specific than its reported description (e.g. "Basement
 Healthbox"); room devices take the room names configured on the Healthbox
 itself.
+
+**Add a vent in Renson's own app and it appears here on the next poll**, no
+reload needed. Remove one and its entities go unavailable rather than
+vanishing - that's the honest state, since a room also stops being reported
+when the API key lapses or the device reboots mid-poll, and silently
+deleting a device would take its history with it. Once you're sure it's
+gone for good, delete the device from its own page and it won't come back.
 
 ### Energy dashboard
 
@@ -455,12 +468,26 @@ actions:
 
 ## Data updates
 
-The integration polls the device every 30 seconds via a
+The integration polls the device every 30 seconds by default via a
 `DataUpdateCoordinator`: `/v2/api/data/current` if an API key is active,
-otherwise `/v1/api/data/current`. Boost status is fetched per room on the
-same cycle (it's a separate endpoint from the main data call). If the
-device goes offline, affected entities go unavailable cleanly and recover
-automatically once it's reachable again - no restart required.
+otherwise `/v1/api/data/current`. If the device goes offline, affected
+entities go unavailable cleanly and recover automatically once it's
+reachable again - no restart required.
+
+**The interval is configurable.** **Settings** → **Devices & Services** →
+**Renson Healthbox 3** → **Configure**, anywhere between 15 seconds and 10
+minutes. The entry reloads itself when you change it.
+
+Pick a shorter one knowingly: a poll is not one request. `data/current`
+goes first, since it's the call that decides whether this is a v1 or a v2
+poll and which rooms exist; then every other endpoint goes out together -
+boost (one request *per room*), decision, Breeze, per-room decisions,
+device errors, fan/duct telemetry and Wi-Fi status. On a seven-room
+installation that's fourteen requests per poll, against a small embedded
+unit. They're issued concurrently but capped, so they overlap without
+arriving all at once, and `/renson_core/v2/global` (firmware version, MAC,
+IP - things that don't change between two polls) is only re-read every
+tenth minute rather than every cycle.
 
 ## Known limitations
 

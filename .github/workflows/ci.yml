@@ -1,6 +1,11 @@
 name: CI
 
+# Also runnable by hand, from the Actions tab. Worth having: a push made
+# by an app installation token - which is how automation pushes here -
+# deliberately does not trigger workflows, so without this the only way to
+# get a run on such a commit is to push it again from a personal account.
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths-ignore:

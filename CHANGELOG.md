@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A poll no longer walks its endpoints one at a time.** `data/current`
+  still goes first alone - it decides whether this is a v1 or a v2 poll and
+  which rooms exist - but the eight reads behind it now go out together,
+  with the client capping how many are actually in flight so a seven-room
+  installation does not land fourteen requests on a small embedded unit at
+  once. Sequentially, at up to the 10s per-request timeout, a slow poll
+  could outlast the interval that scheduled it.
+
+  `/renson_core/v2/global` is also re-read every tenth minute rather than
+  every poll: firmware version, MAC and IP change on a firmware update or a
+  network move, not between two polls. Only successful reads are reused - a
+  failure still takes the entities built on it unavailable and asks again
+  next poll, rather than serving a stale reading for ten minutes.
+- **Diagnostics now dump everything the coordinator holds**, not a
+  selection of it: decision, Breeze, per-room decisions, global info,
+  device errors, `/v1/device` telemetry and Wi-Fi status have been added to
+  the existing room and boost data. A bug report about a wrong reading is
+  usually a bug report about one of the reverse-engineered endpoints, and
+  those were exactly the ones missing.
+- `sensor.py` is split into `sensor_room.py` and `sensor_unit.py` behind a
+  76-line platform entry point. The two halves differ in kind, not just in
+  size: a room sensor exists only if that room reports the reading behind
+  it and must be buildable again for a room that appears later, while a
+  unit sensor is created once from a fixed list.
 - **Each ventilated room is now its own device**, linked back to the unit
   by `via_device_id`, instead of every entity sitting on one device. The unit
   device keeps everything describing the appliance as a whole (air quality,
@@ -64,6 +88,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The poll interval is configurable** (**Settings** → **Devices &
+  Services** → **Renson Healthbox 3** → **Configure**), between 15 seconds
+  and 10 minutes. The entry reloads itself when you change it. See
+  [Data updates](README.md#data-updates) for what one poll actually costs
+  before shortening it.
+- **A vent added in Renson's own app now appears without a reload.** Rooms
+  were read once, at setup; a new one stayed invisible until somebody
+  thought to reload the integration, with nothing anywhere saying that was
+  what it needed. Entities for a room id not seen before are now created on
+  the poll that first reports it.
+- **The device of a room that no longer exists can be deleted.** Home
+  Assistant refuses every device deletion unless an integration says
+  otherwise, so a physically removed vent used to leave a device behind for
+  good, its entities stuck on unavailable and its Delete button inert. The
+  unit and any still-reported room are still refused - deleting one of
+  those would only have it recreated on the next poll.
+- The three workflows that had no manual trigger (CI, mypy, hassfest) can
+  now be run from the Actions tab. A push made with an app installation
+  token deliberately does not start a workflow run, which is why this
+  repository's own history shows none.
 - A test tying the per-language translation checks to the files actually
   on disk, so a language cannot be added - or dropped - without the checks
   following it.
@@ -195,6 +239,18 @@ on an active API key.
 
 ### Fixed
 
+- **Diagnostics published the device's MAC address and IP in clear.**
+  `async_redact_data` matches keys exactly, and this device's address
+  arrives under two spellings - `MAC`/`IP` from the discovery payload,
+  `mac`/`ip` from `/renson_core/v2/global`. Only the uppercase pair was
+  listed. A diagnostics file is what gets pasted into a public issue.
+- **An unparseable silent-schedule time took both time entities out
+  entirely.** `datetime.time.fromisoformat` raises on anything that is not
+  `HH:MM:SS`, and an exception raised from `native_value` does not degrade
+  gracefully: Home Assistant fails to add the entity at all, leaving no
+  silent-schedule control anywhere in the UI and a traceback in the log.
+  Now reads as unknown, which is the honest state for a value the device
+  sent that this integration cannot make sense of.
 - **Each startup logged three deprecation warnings naming this
   integration.** Rooms were linked to the unit with `via_device`, which
   Home Assistant has replaced with `via_device_id`; it still worked, but
