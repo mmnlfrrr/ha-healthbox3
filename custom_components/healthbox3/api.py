@@ -165,105 +165,33 @@ class ApiKeyStatus:
 
 
 @dataclass
-class DaySchedule:
-    """One weekday's silent window: when it starts, when it stops."""
-
-    start_time: str  # "HH:MM:SS", the silent:true entry
-    stop_time: str  # "HH:MM:SS", the silent:false entry
-
-
-@dataclass
 class SilentSettings:
     """Silent (reduced-noise) schedule settings, from `/v1/decision`'s
     `silent` block.
 
-    The per-weekday arrays (`monday`..`sunday`) are each a pair of
+    The real per-weekday arrays (`monday`..`sunday`) are each a pair of
     `{silent, time}` entries - a `silent: true` entry marking when the
-    schedule starts, a `silent: false` entry marking when it stops.
-
-    This client writes one shared pair to all seven days at once (see
-    `async_set_silent_schedule`), matching how the Renson app presents the
-    setting. It used to *read* only `monday` on the same reasoning, which
-    was wrong: a real device was found with Sunday's silent period
-    starting at 10:00 and every other day's at 22:00, and Home Assistant
-    reported 22:00 flat - the one day that differed was the one it could
-    not show. `per_day` now carries what the device actually said, and
-    `uniform` says whether the single-pair view is the whole truth.
-
-    `start_time`/`stop_time` remain Monday's pair, as the reference day
-    the entities display; they are exactly what every day holds when
-    `uniform` is True.
+    schedule starts, a `silent: false` entry marking when it stops. This
+    client only supports a single shared start/stop pair applied
+    uniformly across every day (matching how the Renson app itself
+    presents it, not a genuinely per-day schedule), so only `monday`'s
+    array is ever read; every other weekday is assumed - and always
+    written - to match it exactly.
     """
 
     enable: bool
     reduction: float
     start_time: str  # "HH:MM:SS", the silent:true entry
     stop_time: str  # "HH:MM:SS", the silent:false entry
-    per_day: dict[str, DaySchedule] = field(default_factory=dict)
-
-    @property
-    def uniform(self) -> bool:
-        """Return whether every weekday the device reported holds the same
-        window.
-
-        A device that reported no usable day at all counts as uniform:
-        there is no divergence to warn about, only missing data, which
-        `start_time`/`stop_time` already show as unknown.
-        """
-        return len(set((day.start_time, day.stop_time) for day in self.per_day.values())) <= 1
-
-    @property
-    def diverging_days(self) -> list[str]:
-        """Return the weekdays whose window differs from Monday's, in week
-        order - what a write would flatten.
-        """
-        return [
-            day
-            for day in SILENT_WEEKDAYS
-            if day in self.per_day
-            and (self.per_day[day].start_time, self.per_day[day].stop_time)
-            != (self.start_time, self.stop_time)
-        ]
-
-
-def _parse_day_schedule(raw: Any) -> DaySchedule | None:
-    """Return one weekday's window, or None if the device did not send a
-    usable one.
-
-    A day is two entries keyed by their own `silent` flag rather than by
-    position: nothing promises the order, and reading them positionally
-    would silently swap start and stop the day a firmware sends them the
-    other way round.
-    """
-    if not isinstance(raw, list):
-        return None
-    times = {
-        entry["silent"]: entry["time"]
-        for entry in raw
-        if isinstance(entry, dict) and "silent" in entry and "time" in entry
-    }
-    if True not in times or False not in times:
-        return None
-    return DaySchedule(start_time=times[True], stop_time=times[False])
 
 
 def _parse_silent(raw: dict[str, Any]) -> SilentSettings:
-    per_day = {
-        day: schedule
-        for day in SILENT_WEEKDAYS
-        if (schedule := _parse_day_schedule(raw.get(day))) is not None
-    }
-    # Monday is the reference day the entities show. A device that sent no
-    # usable Monday still has everything else parsed: the times read as
-    # unknown rather than taking the whole decision fetch - and with it
-    # demand control, Silent and minimum ventilation - down with them.
-    monday = per_day.get(SILENT_WEEKDAYS[0])
+    schedule = {entry["silent"]: entry["time"] for entry in raw["monday"]}
     return SilentSettings(
         enable=raw["enable"],
         reduction=raw["reduction"],
-        start_time=monday.start_time if monday else "",
-        stop_time=monday.stop_time if monday else "",
-        per_day=per_day,
+        start_time=schedule[True],
+        stop_time=schedule[False],
     )
 
 

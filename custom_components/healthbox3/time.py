@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Any, override
+from typing import override
 
 from homeassistant.components.time import TimeEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api import SilentSettings
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
 from .entity import Healthbox3Entity
 
@@ -67,33 +66,23 @@ async def async_setup_entry(
     )
 
 
-class Healthbox3SilentTime(Healthbox3Entity, TimeEntity):
-    """One edge - start or stop - of the device's silent schedule.
+class Healthbox3SilentStartTime(Healthbox3Entity, TimeEntity):
+    """The time of day the silent schedule starts.
 
-    The device holds seven independent windows, one per weekday, but
-    offers no way to write just one; a schedule write sends all seven (see
-    `async_set_silent_schedule`), which is also how the Renson app
-    presents the setting. So these two entities show Monday's window as
-    the reference day, and carry the other six in `schedule` for the case
-    the device disagrees with itself - a real unit was found with Sunday
-    starting at 10:00 and every other day at 22:00.
+    Writing this reads the current stop_time from already-fetched
+    coordinator data and sends both together - the wire format has no
+    "just the start" write, see async_set_silent_schedule.
     """
 
+    _attr_translation_key = "silent_start_time"
     _attr_entity_category = EntityCategory.CONFIG
-    _edge: str  # the DaySchedule field this entity reads, per weekday
 
     def __init__(
-        self, coordinator: Healthbox3DataUpdateCoordinator, serial: str, key: str
+        self, coordinator: Healthbox3DataUpdateCoordinator, serial: str
     ) -> None:
         """Initialize the time entity."""
         super().__init__(coordinator, serial)
-        self._attr_translation_key = key
-        self._attr_unique_id = f"{serial}_{key}"
-
-    @property
-    def _silent(self) -> SilentSettings | None:
-        decision = self.coordinator.data.decision
-        return decision.silent if decision is not None else None
+        self._attr_unique_id = f"{serial}_silent_start_time"
 
     @property
     @override
@@ -104,86 +93,64 @@ class Healthbox3SilentTime(Healthbox3Entity, TimeEntity):
     @property
     @override
     def native_value(self) -> datetime.time | None:
-        """Return this edge of Monday's window - see the class docstring."""
-        silent = self._silent
-        if silent is None:
+        """Return the silent schedule's current start time."""
+        decision = self.coordinator.data.decision
+        if decision is None:
             return None
-        return _parse_time(getattr(silent, self._edge))
+        return _parse_time(decision.silent.start_time)
 
-    @property
     @override
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return this edge per weekday, and whether they all agree.
-
-        Without this, a device whose days differ is shown as Monday's
-        value flat, with the one day that differs being the one day the
-        user cannot see - and a write silently flattens it.
-        """
-        silent = self._silent
-        if silent is None:
-            return {}
-        return {
-            "uniform": silent.uniform,
-            "schedule": {
-                day: getattr(schedule, self._edge)
-                for day, schedule in silent.per_day.items()
-            },
-        }
-
-    async def _async_write(self, *, start_time: str, stop_time: str) -> None:
-        """Send a schedule write, saying so first if it flattens the week."""
-        silent = self._silent
-        assert silent is not None  # HA only calls this when `available` is True
-        if diverging := silent.diverging_days:
-            _LOGGER.warning(
-                "Setting the Healthbox silent schedule applies one window to "
-                "every weekday; the device currently has a different one on "
-                "%s, which this overwrites",
-                ", ".join(diverging),
-            )
+    async def async_set_value(self, value: datetime.time) -> None:
+        """Set the silent schedule's start time."""
+        decision = self.coordinator.data.decision
+        assert decision is not None  # HA only calls this when `available` is True
+        stop_time = decision.silent.stop_time
         await self.coordinator.client.async_set_silent_schedule(
-            start_time=start_time, stop_time=stop_time
+            start_time=value.isoformat(), stop_time=stop_time
         )
         await self.coordinator.async_request_refresh()
 
 
-class Healthbox3SilentStartTime(Healthbox3SilentTime):
-    """The time of day the silent schedule starts."""
+class Healthbox3SilentStopTime(Healthbox3Entity, TimeEntity):
+    """The time of day the silent schedule stops.
 
-    _edge = "start_time"
+    Writing this reads the current start_time from already-fetched
+    coordinator data and sends both together - see
+    Healthbox3SilentStartTime and async_set_silent_schedule.
+    """
 
-    def __init__(
-        self, coordinator: Healthbox3DataUpdateCoordinator, serial: str
-    ) -> None:
-        """Initialize the time entity."""
-        super().__init__(coordinator, serial, "silent_start_time")
-
-    @override
-    async def async_set_value(self, value: datetime.time) -> None:
-        """Set the silent schedule's start time, keeping the stop time."""
-        silent = self._silent
-        assert silent is not None  # HA only calls this when `available` is True
-        await self._async_write(
-            start_time=value.isoformat(), stop_time=silent.stop_time
-        )
-
-
-class Healthbox3SilentStopTime(Healthbox3SilentTime):
-    """The time of day the silent schedule stops."""
-
-    _edge = "stop_time"
+    _attr_translation_key = "silent_stop_time"
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
         self, coordinator: Healthbox3DataUpdateCoordinator, serial: str
     ) -> None:
         """Initialize the time entity."""
-        super().__init__(coordinator, serial, "silent_stop_time")
+        super().__init__(coordinator, serial)
+        self._attr_unique_id = f"{serial}_silent_stop_time"
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Return whether the device's decision data is known."""
+        return super().available and self.coordinator.data.decision is not None
+
+    @property
+    @override
+    def native_value(self) -> datetime.time | None:
+        """Return the silent schedule's current stop time."""
+        decision = self.coordinator.data.decision
+        if decision is None:
+            return None
+        return _parse_time(decision.silent.stop_time)
 
     @override
     async def async_set_value(self, value: datetime.time) -> None:
-        """Set the silent schedule's stop time, keeping the start time."""
-        silent = self._silent
-        assert silent is not None  # HA only calls this when `available` is True
-        await self._async_write(
-            start_time=silent.start_time, stop_time=value.isoformat()
+        """Set the silent schedule's stop time."""
+        decision = self.coordinator.data.decision
+        assert decision is not None  # HA only calls this when `available` is True
+        start_time = decision.silent.start_time
+        await self.coordinator.client.async_set_silent_schedule(
+            start_time=start_time, stop_time=value.isoformat()
         )
+        await self.coordinator.async_request_refresh()

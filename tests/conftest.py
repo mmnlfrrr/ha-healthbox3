@@ -126,30 +126,6 @@ def device_decision(decision_raw) -> api_mod.DeviceDecision:
 
 
 @pytest.fixture
-def v2_decision_raw() -> dict:
-    """Raw JSON from a real device's /v2/decision, commissioning answers
-    redacted (they describe the dwelling, not the device).
-
-    The whole decision tree in one response - profiles, per-room boost and
-    demand, Breeze, Silent, Program, fire protection. Notably this unit's
-    silent schedule is *not* uniform: Sunday's window starts at 10:00,
-    every other day's at 22:00, which is what the hand-built
-    `v1-decision.json` (all seven days identical) could never have shown.
-    """
-    return _load_fixture("v2-decision.json")
-
-
-@pytest.fixture
-def real_decision(v2_decision_raw) -> api_mod.DeviceDecision:
-    """Parsed DeviceDecision from the real /v2/decision capture.
-
-    `_parse_decision` reads the same keys from either endpoint - the
-    device-wide block is identical in `/v1/decision` and `/v2/decision`.
-    """
-    return api_mod._parse_decision(v2_decision_raw)
-
-
-@pytest.fixture
 def breeze_raw() -> dict:
     """Hand-built /v2/decision/breeze JSON, generic values."""
     return _load_fixture("v2-decision-breeze.json")
@@ -267,12 +243,6 @@ def mock_api_client():
         # and report one as its state. Default them to "not reported".
         client.async_get_device = AsyncMock(return_value=None)
         client.async_get_wifi_status = AsyncMock(return_value=None)
-        # Same quirk once more: an unconfigured async_get_decision returns a
-        # mock the coordinator stores as real decision data, so every entity
-        # built on it reads attributes off a mock - and `silent.per_day`
-        # answers with a mock whose `.items()` is an unawaited coroutine.
-        # Default to "not reported"; tests that need a decision pass one.
-        client.async_get_decision = AsyncMock(return_value=None)
         # Same quirk, sharpest edge yet: an unconfigured async_get_global
         # returns a mock whose .mac is itself a mock, which entity.py puts
         # straight into the device registry's `connections` - and the
