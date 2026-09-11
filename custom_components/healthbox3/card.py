@@ -28,7 +28,11 @@ from aiohttp import web
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+)
 
 from .api import DeviceError, HealthboxData, room_symbol, room_valve_port
 from .const import DOMAIN
@@ -48,6 +52,7 @@ _ROOM_ENTITIES: dict[str, tuple[str, str]] = {
     "airflow": ("sensor", "airflow"),
     "airflow_rate": ("sensor", "airflow_rate"),
     "aqi_level": ("sensor", "aqi_level"),
+    "legislation_code": ("sensor", "legislation_code"),
     "boost": ("fan", "boost"),
     "profile": ("select", "profile"),
 }
@@ -70,6 +75,36 @@ def _room_entities(
         if entity_id is not None:
             found[key] = entity_id
     return found
+
+
+def _room_area(
+    area_registry: ar.AreaRegistry,
+    devices: dict[tuple[str, str], dr.DeviceEntry],
+    entity_registry: er.EntityRegistry,
+    serial: str,
+    room_id: int,
+    entity_id: str | None,
+) -> str | None:
+    """Return the Home Assistant area this room sits in, if any.
+
+    Each ventilated room is its own device (see entity.py), and an area is
+    assigned per device, so that is where the answer normally is. An
+    entity can override its device's area though, so a room entity that
+    has been moved on its own wins - that is the order Home Assistant
+    itself resolves in.
+    """
+    area_id: str | None = None
+    if entity_id is not None:
+        entry = entity_registry.async_get(entity_id)
+        if entry is not None:
+            area_id = entry.area_id
+    if area_id is None:
+        device = devices.get((DOMAIN, f"{serial}_room{room_id}"))
+        area_id = device.area_id if device is not None else None
+    if area_id is None:
+        return None
+    area = area_registry.async_get_area(area_id)
+    return area.name if area is not None else None
 
 
 def _attribute_errors(
@@ -114,6 +149,8 @@ def _attribute_errors(
 def build_layout(hass: HomeAssistant) -> dict[str, Any]:
     """Return every configured unit's topology."""
     registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    area_registry = ar.async_get(hass)
     units: list[dict[str, Any]] = []
 
     for entry in hass.config_entries.async_entries(DOMAIN):
@@ -122,6 +159,13 @@ def build_layout(hass: HomeAssistant) -> dict[str, Any]:
             continue
         healthbox = coordinator.data.healthbox
         serial = healthbox.serial
+        devices = {
+            identifier: device
+            for device in dr.async_entries_for_config_entry(
+                device_registry, entry.entry_id
+            )
+            for identifier in device.identifiers
+        }
 
         faulted, unattributed = _attribute_errors(coordinator.data.errors, healthbox)
 
@@ -133,17 +177,26 @@ def build_layout(hass: HomeAssistant) -> dict[str, Any]:
                 # it; it stays a normal entity, just not on the card.
                 continue
             symbol = room_symbol(room)
+            entities = _room_entities(registry, serial, room.id)
             rooms.append(
                 {
                     "id": room.id,
                     "port": port,
                     "name": room.name,
+                    "area": _room_area(
+                        area_registry,
+                        devices,
+                        registry,
+                        serial,
+                        room.id,
+                        entities.get("airflow"),
+                    ),
                     "icon": "custom:{}-{}".format(
                         ICON_PREFIX,
                         ROOM_SYMBOL_TO_ICON.get(symbol or "", FALLBACK_ICON),
                     ),
                     "error": port in faulted,
-                    "entities": _room_entities(registry, serial, room.id),
+                    "entities": entities,
                 }
             )
 
@@ -518,6 +571,14 @@ class HealthboxCard extends HTMLElement {
   }
 
   _tipContent(room, label) {
+    // Three tiers: what the room is, where it sits, what it is doing.
+    // The middle one is the quiet one - the Home Assistant area and the
+    // regulatory code are context you look up, not figures you watch.
+    const where = [];
+    if (room.area) where.push(room.area);
+    const code = this._state(room.entities.legislation_code);
+    if (code) where.push(code.state);
+
     const detail = [];
     const flow = this._state(room.entities.airflow);
     const rate = this._state(room.entities.airflow_rate);
@@ -532,11 +593,15 @@ class HealthboxCard extends HTMLElement {
     if (boost && boost.state === "on") detail.push("Boost");
 
     return (
-      `<ha-icon icon="${room.icon}" style="--mdc-icon-size:20px;` +
+      `<ha-icon icon="${room.icon}" style="--mdc-icon-size:22px;` +
       `color:${room.error ? "var(--error-color,#db4437)" : "inherit"}"></ha-icon>` +
-      `<span><b>${label} · ${room.name}</b>` +
+      `<span style="line-height:1.35"><b>${label} · ${room.name}</b>` +
+      (where.length
+        ? `<br><span style="font-size:11px;opacity:.55">` +
+          `${where.join(" · ")}</span>`
+        : "") +
       (detail.length
-        ? `<br><span style="opacity:.7">${detail.join(" · ")}</span>`
+        ? `<br><span style="opacity:.75">${detail.join(" · ")}</span>`
         : "") +
       `</span>`
     );

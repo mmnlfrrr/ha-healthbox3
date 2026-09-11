@@ -11,6 +11,12 @@ from __future__ import annotations
 import copy
 import json
 
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+)
+
 from custom_components.healthbox3 import api as api_mod
 from custom_components.healthbox3.card import (
     CARD_URL,
@@ -18,6 +24,7 @@ from custom_components.healthbox3.card import (
     build_card_module,
     build_layout,
 )
+from custom_components.healthbox3.const import DOMAIN
 from custom_components.healthbox3.scene_assets import SCENE_ASSETS, SCENE_GEOMETRY
 
 from .conftest import setup_integration
@@ -173,6 +180,98 @@ async def test_chains_on_every_edge_survive_into_the_layout(
     assert grouped == {2: [1, 2], 3: [3, 4, 5], 6: [6], 7: [7]}
     # Ordered by port, then by room id, so the branch numbering is stable.
     assert [room["port"] for room in rooms] == [2, 2, 3, 3, 3, 6, 7]
+
+
+async def test_layout_reports_the_home_assistant_area_of_each_room(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """Rooms are devices, and areas are assigned per device, so that is
+    where the answer normally is.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    areas = ar.async_get(hass)
+    devices = dr.async_get(hass)
+    bathroom = areas.async_create("Salle de bains")
+    device = next(
+        d
+        for d in dr.async_entries_for_config_entry(devices, entry.entry_id)
+        if (DOMAIN, f"{v2_data.serial}_room2") in d.identifiers
+    )
+    devices.async_update_device(device.id, area_id=bathroom.id)
+
+    rooms = {r["id"]: r for r in build_layout(hass)["units"][0]["rooms"]}
+
+    assert rooms[2]["area"] == "Salle de bains"
+    assert rooms[1]["area"] is None
+
+
+async def test_an_entity_moved_on_its_own_overrides_its_device_area(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """Home Assistant lets an entity sit in a different area from its
+    device, and resolves the entity's own first. The card should say what
+    Home Assistant says.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    areas = ar.async_get(hass)
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    on_device = areas.async_create("Cellier")
+    on_entity = areas.async_create("Buanderie")
+
+    device = next(
+        d
+        for d in dr.async_entries_for_config_entry(devices, entry.entry_id)
+        if (DOMAIN, f"{v2_data.serial}_room2") in d.identifiers
+    )
+    devices.async_update_device(device.id, area_id=on_device.id)
+    airflow = entities.async_get_entity_id(
+        "sensor", DOMAIN, f"{v2_data.serial}_room2_airflow"
+    )
+    entities.async_update_entity(airflow, area_id=on_entity.id)
+
+    rooms = {r["id"]: r for r in build_layout(hass)["units"][0]["rooms"]}
+
+    assert rooms[2]["area"] == "Buanderie"
+
+
+async def test_layout_offers_the_legislation_code_entity(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The regulatory code is shown beside the room in Renson's own app,
+    so the card offers it too - but only where the unit reports one.
+    """
+    coded = copy.deepcopy(v2_data)
+    next(r for r in coded.rooms if r.id == 1).parameters["legislation_code"] = (
+        api_mod.Parameter(value="C22")
+    )
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=coded.serial,
+        healthbox_data=coded,
+        boost_status=boost_status,
+    )
+
+    rooms = {r["id"]: r for r in build_layout(hass)["units"][0]["rooms"]}
+
+    assert rooms[1]["entities"]["legislation_code"].startswith("sensor.")
+    assert "legislation_code" not in rooms[2]["entities"]
 
 
 async def test_an_error_is_pinned_to_an_outlet_only_when_it_names_a_port(

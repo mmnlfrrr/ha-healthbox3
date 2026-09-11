@@ -44,8 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A Healthbox card**, drawing the unit and its outlets the way the
   Renson app does: a numbered connection at each wired collector port and
   a cap everywhere else, with the unit centred. Hovering an outlet shows
-  its room - pictogram, name, airflow, air quality, profile, boost - and
-  clicking it opens that room's more-info. The hover panel is placed with
+  its room - pictogram, name, the Home Assistant area it sits in, its
+  regulatory code, airflow, air quality, profile and boost - and clicking
+  it opens that room's more-info. The hover panel is placed with
   CSS anchor positioning where the browser has it, so it flips itself to
   stay inside the card near an edge, and falls back to a fixed offset
   where it does not. Add it from the card picker;
