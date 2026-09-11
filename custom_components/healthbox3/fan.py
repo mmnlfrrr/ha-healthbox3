@@ -29,7 +29,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .api import BoostStatus, Room
-from .const import BOOST_DURATION_PRESETS, BOOST_LEVEL_MAX, BOOST_LEVEL_MIN, DOMAIN
+from .const import BOOST_DURATION_PRESETS, BOOST_LEVEL_MIN, DOMAIN
 from .coordinator import (
     BoostParams,
     Healthbox3ConfigEntry,
@@ -53,14 +53,22 @@ _SUPPORTED_FEATURES = (
 )
 
 
-def _level_to_percentage(level: float) -> int:
-    """Rescale the device's real 10-200% boost level onto HA's 0-100 slider."""
-    return round((level - BOOST_LEVEL_MIN) / (BOOST_LEVEL_MAX - BOOST_LEVEL_MIN) * 100)
+def _level_to_percentage(level: float, maximum: float) -> int:
+    """Rescale a real boost level onto HA's 0-100 slider.
+
+    `maximum` is this fan's own ceiling rather than a constant: a room
+    whose device-stored default exceeds the app's 200% - a kitchen
+    commissioned to a regulatory 270% is the confirmed case - answers to
+    its own range, so that its full rate is reachable at all. Rooms inside
+    the app's range are unaffected, and so is the meaning of a percentage
+    already written into an automation for one.
+    """
+    return round((level - BOOST_LEVEL_MIN) / (maximum - BOOST_LEVEL_MIN) * 100)
 
 
-def _percentage_to_level(percentage: int) -> float:
+def _percentage_to_level(percentage: int, maximum: float) -> float:
     """Inverse of _level_to_percentage."""
-    return percentage / 100 * (BOOST_LEVEL_MAX - BOOST_LEVEL_MIN) + BOOST_LEVEL_MIN
+    return percentage / 100 * (maximum - BOOST_LEVEL_MIN) + BOOST_LEVEL_MIN
 
 
 def _preset_mode_for_timeout(timeout: int) -> str:
@@ -167,6 +175,17 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
         self._params = params
         self._attr_unique_id = unique_id
         self._attr_translation_key = translation_key
+        self._scale_room_id = room.id if room is not None else None
+
+    @property
+    def _level_max(self) -> float:
+        """Return the top of this fan's own boost scale.
+
+        Read through the coordinator on every access rather than captured
+        at construction: a room's ceiling comes from what the device
+        reports, and the fan outlives any one poll.
+        """
+        return self.coordinator.level_max(self._scale_room_id)
 
     # --- overridden by subclasses ---
 
@@ -208,7 +227,7 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
         """Return the boost level rescaled to 0-100, or 0 if boost is off."""
         if not self._is_active():
             return 0
-        return max(1, _level_to_percentage(self._params.level))
+        return min(100, max(1, _level_to_percentage(self._params.level, self._level_max)))
 
     @property
     @override
@@ -220,7 +239,13 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
     @override
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the real (unscaled) boost level and, if known, remaining time."""
-        attrs: dict[str, Any] = {"level": f"{self._params.level:.0f}%"}
+        attrs: dict[str, Any] = {
+            "level": f"{self._params.level:.0f}%",
+            # What 100% on this fan's slider actually asks for. It is not
+            # the same figure on every room, so leaving it out would make
+            # the slider unreadable on the rooms that differ.
+            "level_max": f"{self._level_max:.0f}%",
+        }
         remaining = self._remaining()
         if remaining is not None:
             attrs["remaining"] = remaining
@@ -237,7 +262,7 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
         # A restored 0 means "was off" - it carries no usable level
         # information, so leave the coordinator-seeded default in place.
         if percentage:
-            self._params.level = _percentage_to_level(percentage)
+            self._params.level = _percentage_to_level(percentage, self._level_max)
         preset_mode = last_state.attributes.get(ATTR_PRESET_MODE)
         if preset_mode in BOOST_DURATION_PRESETS:
             self._params.timeout = _timeout_for_preset_mode(preset_mode)
@@ -272,7 +297,7 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
         if preset_mode is not None:
             self._params.timeout = _timeout_for_preset_mode(preset_mode)
         if percentage:
-            self._params.level = _percentage_to_level(percentage)
+            self._params.level = _percentage_to_level(percentage, self._level_max)
         await self._async_activate()
 
     @override
@@ -288,7 +313,7 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
         if percentage == 0:
             await self._async_apply(False)
             return
-        self._params.level = _percentage_to_level(percentage)
+        self._params.level = _percentage_to_level(percentage, self._level_max)
         await self._async_activate()
 
     @override

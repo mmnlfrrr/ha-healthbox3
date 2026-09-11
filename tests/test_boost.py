@@ -13,6 +13,8 @@ from homeassistant.exceptions import HomeAssistantError
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
 from custom_components.healthbox3 import api as api_mod
+from custom_components.healthbox3.const import BOOST_LEVEL_MAX
+from custom_components.healthbox3.coordinator import _level_ceiling
 from custom_components.healthbox3.fan import (
     _level_to_percentage,
     _percentage_to_level,
@@ -65,7 +67,7 @@ def _boost(
     ],
 )
 def test_level_to_percentage(level, expected_percentage):
-    assert _level_to_percentage(level) == expected_percentage
+    assert _level_to_percentage(level, BOOST_LEVEL_MAX) == expected_percentage
 
 
 @pytest.mark.parametrize(
@@ -78,7 +80,9 @@ def test_level_to_percentage(level, expected_percentage):
     ],
 )
 def test_percentage_to_level(percentage, expected_level):
-    assert _percentage_to_level(percentage) == pytest.approx(expected_level)
+    assert _percentage_to_level(percentage, BOOST_LEVEL_MAX) == pytest.approx(
+        expected_level
+    )
 
 
 @pytest.mark.parametrize(
@@ -220,7 +224,7 @@ async def test_boost_fan_set_percentage_while_off_turns_on_at_new_level(
     )
 
     mock_api_client.async_set_boost.assert_awaited_once_with(
-        1, enable=True, level=_percentage_to_level(75), timeout=900
+        1, enable=True, level=_percentage_to_level(75, BOOST_LEVEL_MAX), timeout=900
     )
 
 
@@ -246,7 +250,7 @@ async def test_boost_fan_set_percentage_while_active_restarts_and_logs(
         )
 
     mock_api_client.async_set_boost.assert_awaited_once_with(
-        1, enable=True, level=_percentage_to_level(75), timeout=900
+        1, enable=True, level=_percentage_to_level(75, BOOST_LEVEL_MAX), timeout=900
     )
     assert any("Restarting active boost" in r.message for r in caplog.records)
 
@@ -473,7 +477,7 @@ async def test_boost_all_fan_set_percentage_pushes_every_room(
     for call in mock_api_client.async_set_boost.await_args_list:
         assert call.kwargs == {
             "enable": True,
-            "level": _percentage_to_level(75),
+            "level": _percentage_to_level(75, BOOST_LEVEL_MAX),
             "timeout": 900,
         }
 
@@ -502,3 +506,193 @@ async def test_boost_all_fan_turn_on_raises_if_any_room_fails(
         await hass.services.async_call(
             "fan", "turn_on", {"entity_id": _ALL_ENTITY}, blocking=True
         )
+
+
+# --- per-room boost scale ---
+
+
+@pytest.mark.parametrize(
+    ("default_level", "expected"),
+    [
+        (None, BOOST_LEVEL_MAX),  # nothing reported: the app's own range
+        (100.0, BOOST_LEVEL_MAX),  # inside it: unchanged
+        (200.0, BOOST_LEVEL_MAX),
+        (270.0, 270.0),  # a kitchen commissioned to a regulatory rate
+    ],
+)
+def test_level_ceiling(default_level, expected):
+    """A room's ceiling widens to its own stored default, never narrows."""
+    assert _level_ceiling(default_level) == expected
+
+
+@pytest.mark.parametrize(
+    ("level", "maximum", "expected_percentage"),
+    [
+        (270.0, 270.0, 100),  # the whole point: reachable at all
+        (140.0, 270.0, 50),
+        (200.0, 270.0, 73),
+        (200.0, BOOST_LEVEL_MAX, 100),  # a room inside the app's range
+    ],
+)
+def test_level_to_percentage_scales_per_room(level, maximum, expected_percentage):
+    assert _level_to_percentage(level, maximum) == expected_percentage
+
+
+async def test_a_room_that_stores_more_than_the_app_offers_keeps_its_own_rate(
+    hass, mock_api_client, v1_data
+):
+    """Confirmed on real hardware: a kitchen whose `default_level` is 270%
+    - the French hygro B peak extraction rate, 135 m3/h of a 50 m3/h
+    nominal, written in at commissioning.
+
+    Clamped to the app's 200%, Home Assistant staged 200 and asked that
+    kitchen for 100 m3/h: a regulatory figure quietly rewritten, with
+    every entity still looking perfectly plausible.
+    """
+    statuses = {room.id: _boost(False) for room in v1_data.rooms}
+    statuses[1] = _boost(False, default_level=270.0)
+
+    async def _get_boost(room_id: int) -> api_mod.BoostStatus:
+        return statuses[room_id]
+
+    mock_api_client.async_get_boost = AsyncMock(side_effect=_get_boost)
+
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+    )
+    coordinator = entry.runtime_data
+
+    assert coordinator.level_max(1) == 270.0
+    # Seeded from the device, not rounded down to what the app offers.
+    assert coordinator.boost_params[1].level == 270.0
+
+    await hass.services.async_call(
+        "fan", "turn_on", {"entity_id": _ROOM1_ENTITY, "percentage": 100}, blocking=True
+    )
+
+    mock_api_client.async_set_boost.assert_awaited_once_with(
+        1, enable=True, level=270.0, timeout=900
+    )
+
+
+async def test_only_the_room_that_differs_changes_scale(
+    hass, mock_api_client, v1_data
+):
+    """The reason this is per-room rather than one wider global range: a
+    percentage already written into an automation for any other room has
+    to keep meaning what it meant.
+    """
+    statuses = {room.id: _boost(False) for room in v1_data.rooms}
+    statuses[1] = _boost(False, default_level=270.0)
+
+    async def _get_boost(room_id: int) -> api_mod.BoostStatus:
+        return statuses[room_id]
+
+    mock_api_client.async_get_boost = AsyncMock(side_effect=_get_boost)
+
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+    )
+    coordinator = entry.runtime_data
+
+    assert coordinator.level_max(2) == BOOST_LEVEL_MAX
+
+    await hass.services.async_call(
+        "fan",
+        "turn_on",
+        {"entity_id": "fan.bathroom_boost", "percentage": 75},
+        blocking=True,
+    )
+
+    mock_api_client.async_set_boost.assert_awaited_once_with(
+        2, enable=True, level=_percentage_to_level(75, BOOST_LEVEL_MAX), timeout=900
+    )
+
+
+async def test_the_all_rooms_fan_keeps_the_apps_range(hass, mock_api_client, v1_data):
+    """`Boost all` sends one level to every room at once, and a level above
+    the app's range is only known to be accepted by the one room that
+    stores it as its own default. Widening it here would push an untested
+    figure at every other room.
+    """
+    statuses = {room.id: _boost(False) for room in v1_data.rooms}
+    statuses[1] = _boost(False, default_level=270.0)
+
+    async def _get_boost(room_id: int) -> api_mod.BoostStatus:
+        return statuses[room_id]
+
+    mock_api_client.async_get_boost = AsyncMock(side_effect=_get_boost)
+
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+    )
+
+    assert entry.runtime_data.level_max(None) == BOOST_LEVEL_MAX
+    assert hass.states.get(_ALL_ENTITY).attributes["level_max"] == "200%"
+
+
+async def test_a_fan_says_what_its_full_slider_asks_for(hass, mock_api_client, v1_data):
+    """100% is not the same figure on every room now, so a slider that did
+    not say which one would be unreadable.
+    """
+    statuses = {room.id: _boost(True) for room in v1_data.rooms}
+    statuses[1] = _boost(True, default_level=270.0)
+
+    async def _get_boost(room_id: int) -> api_mod.BoostStatus:
+        return statuses[room_id]
+
+    mock_api_client.async_get_boost = AsyncMock(side_effect=_get_boost)
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+    )
+
+    assert hass.states.get(_ROOM1_ENTITY).attributes["level_max"] == "270%"
+    assert hass.states.get("fan.bathroom_boost").attributes["level_max"] == "200%"
+
+
+async def test_a_reconfigured_room_follows_its_new_ceiling(
+    hass, mock_api_client, v1_data
+):
+    """The ceiling describes the device's configuration, not this
+    integration's memory of it: a room re-commissioned at the unit must not
+    keep answering to the range it had when Home Assistant first saw it.
+    """
+    statuses = {room.id: _boost(False) for room in v1_data.rooms}
+
+    async def _get_boost(room_id: int) -> api_mod.BoostStatus:
+        return statuses[room_id]
+
+    mock_api_client.async_get_boost = AsyncMock(side_effect=_get_boost)
+
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+    )
+    coordinator = entry.runtime_data
+    assert coordinator.level_max(1) == BOOST_LEVEL_MAX
+
+    statuses[1] = _boost(False, default_level=270.0)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert coordinator.level_max(1) == 270.0

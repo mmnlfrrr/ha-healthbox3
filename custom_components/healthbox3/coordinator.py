@@ -92,10 +92,28 @@ class BoostParams:
     timeout: int
 
 
-def _clamp_level(level: float | None) -> float:
+def _level_ceiling(default_level: float | None) -> float:
+    """Return the highest boost level a room will be asked for.
+
+    Renson's app stops at BOOST_LEVEL_MAX, but the device does not: a real
+    unit holds `default_level: 270` for its kitchen, the French hygro B
+    peak extraction rate written in at commissioning. Taking 200 as the
+    limit silently rewrote that to 200 - 135 m3/h of regulatory airflow
+    asked for as 100.
+
+    So a room's ceiling is its own stored default when that is higher.
+    Every room whose default sits inside the app's range keeps exactly the
+    scale it had, which is why this widens rather than replaces.
+    """
+    if default_level is None:
+        return BOOST_LEVEL_MAX
+    return max(BOOST_LEVEL_MAX, default_level)
+
+
+def _clamp_level(level: float | None, maximum: float = BOOST_LEVEL_MAX) -> float:
     if level is None:
         return BOOST_FALLBACK_LEVEL
-    return max(BOOST_LEVEL_MIN, min(BOOST_LEVEL_MAX, level))
+    return max(BOOST_LEVEL_MIN, min(maximum, level))
 
 
 def _clamp_timeout(timeout: int | None) -> int:
@@ -160,6 +178,10 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         self.client = client
         self.use_v2 = use_v2
         self.boost_params: dict[int, BoostParams] = {}
+        # The top of each room's own boost scale - see _level_ceiling. Keyed
+        # by room id and filled from every poll's boost read; `level_max`
+        # answers for a room not in it yet.
+        self.boost_level_max: dict[int, float] = {}
         self.boost_all_params = BoostParams(
             level=BOOST_FALLBACK_LEVEL, timeout=BOOST_FALLBACK_TIMEOUT
         )
@@ -174,6 +196,19 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         # before any platform is forwarded - see entity.py's _room_device
         # for why it cannot be worked out from the room's side.
         self.unit_device_id: str | None = None
+
+    def level_max(self, room_id: int | None) -> float:
+        """Return the top of a room's boost scale - see `_level_ceiling`.
+
+        `None` is the all-rooms fan, which sends one level to every room at
+        once: it keeps the app's own range, since a level above it is only
+        known to be accepted by the one room that stores it as its default.
+        A room not polled yet gets the same answer, for the same reason -
+        nothing yet says it takes more.
+        """
+        if room_id is None:
+            return BOOST_LEVEL_MAX
+        return self.boost_level_max.get(room_id, BOOST_LEVEL_MAX)
 
     @override
     async def _async_update_data(self) -> Healthbox3Data:
@@ -536,12 +571,19 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             if isinstance(result, BaseException):
                 raise result
             boost[room.id] = result
+            # The room's ceiling is refreshed every poll, unlike the staged
+            # level below: it describes the device's own configuration, so
+            # a room reconfigured at the unit must not keep answering to
+            # the range it had when Home Assistant first saw it.
+            self.boost_level_max[room.id] = _level_ceiling(result.default_level)
             if room.id not in self.boost_params:
                 # Seed once from the room's own device-reported defaults;
                 # never overwritten afterwards so a user's own choice (or a
                 # restored one) sticks across refreshes.
                 self.boost_params[room.id] = BoostParams(
-                    level=_clamp_level(result.default_level),
+                    level=_clamp_level(
+                        result.default_level, self.boost_level_max[room.id]
+                    ),
                     timeout=_clamp_timeout(result.default_timeout),
                 )
         return boost

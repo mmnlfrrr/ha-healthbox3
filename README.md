@@ -345,14 +345,30 @@ a boost fan only means "boost cancelled - back to that normal profile-driven
 rate," not "no airflow."
 
 **The percentage slider is rescaled**, not the device's real numbers. The
-Healthbox's actual boost level is 10-200% of a room's nominal flow rate, but
-Home Assistant's fan platform hard-requires a plain 0-100% domain, so:
+Healthbox's actual boost level is a percentage of a room's nominal flow
+rate, but Home Assistant's fan platform hard-requires a plain 0-100%
+domain, so:
 - 0% = boost off (`enable: false`) - ventilation continues at the profile rate
-- 1-100% = boost on, linearly rescaled onto the device's real 10-200% range
+- 1-100% = boost on, linearly rescaled onto that room's real range
 
-The real, unscaled level (e.g. `"150%"`) is always shown as a `level`
-attribute on the entity, so you can see what the device actually received
-even though the slider itself reads a clean 0-100.
+**That range is per room**, and its top is not always the 200% Renson's own
+app offers. A room's ceiling is the higher of 200% and the level the device
+itself stores as that room's default - because those defaults are not
+always inside the app's range: a kitchen commissioned to French hygro B
+regulations stores **270%**, which is its 135 m³/h peak extraction rate on
+a 50 m³/h nominal. Held to 200%, Home Assistant could only ever ask that
+kitchen for 100 m³/h.
+
+Every room whose default sits inside 10-200% - which is all of them on
+hardware seen so far bar that kitchen - keeps exactly the scale it had, so
+a percentage already written into an automation still means what it meant.
+`Boost all` also keeps the 200% range: it sends one level to every room at
+once, and a level above the app's range is only known to be accepted by the
+one room that stores it.
+
+Two attributes make the slider readable: `level` is the real, unscaled
+level the device received (e.g. `"150%"`), and `level_max` is what 100% on
+that particular fan asks for (`"200%"`, or `"270%"` for the kitchen above).
 
 **Duration is a preset picker**, not exact minutes: `5 min`, `10 min`,
 `15 min`, `30 min`, `45 min`, `1 hour`, `2 hours`, `4 hours` - a fixed list,

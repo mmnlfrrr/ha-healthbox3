@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock
 from homeassistant.setup import async_setup_component
 
 from custom_components.healthbox3 import api as api_mod
+from custom_components.healthbox3.const import BOOST_LEVEL_MAX
 from custom_components.healthbox3.fan import _percentage_to_level
 
 from .conftest import setup_integration
@@ -88,7 +89,7 @@ async def test_automation_turns_on_room_boost_with_percentage(
     )
 
     mock_api_client.async_set_boost.assert_awaited_once_with(
-        1, enable=True, level=_percentage_to_level(75), timeout=900
+        1, enable=True, level=_percentage_to_level(75, BOOST_LEVEL_MAX), timeout=900
     )
     state = hass.states.get(_ROOM1_ENTITY)
     assert state.state == "on"
@@ -145,7 +146,7 @@ async def test_automation_restarts_active_boost_and_logs(
         )
 
     mock_api_client.async_set_boost.assert_awaited_once_with(
-        1, enable=True, level=_percentage_to_level(50), timeout=900
+        1, enable=True, level=_percentage_to_level(50, BOOST_LEVEL_MAX), timeout=900
     )
     assert any("Restarting active boost" in r.message for r in caplog.records)
 

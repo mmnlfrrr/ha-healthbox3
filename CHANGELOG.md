@@ -252,6 +252,27 @@ on an active API key.
 
 ### Fixed
 
+- **A room whose boost level exceeds what Renson's app offers is no longer
+  clamped to it.** The boost scale was fixed at 10-200%, described as "the
+  range offered by Renson's own app" - but the device does not stop there.
+  A real unit stores `default_level: 270` for its kitchen: the French
+  hygro B peak extraction rate, 135 m³/h of a 50 m³/h nominal, written in
+  at commissioning. Home Assistant rounded that down to 200 and asked the
+  kitchen for 100 m³/h - a regulatory figure quietly rewritten, with every
+  entity still looking perfectly plausible.
+
+  Each room's ceiling is now the higher of 200% and the level the device
+  itself reports as that room's default, refreshed every poll so a room
+  re-commissioned at the unit follows. **Rooms inside the app's range keep
+  exactly the scale they had**, which is why this is per room rather than
+  one wider global range: a percentage already written into an automation
+  for any other room still means what it meant. `Boost all` keeps the
+  200% range too - it sends one level to every room at once, and a level
+  above the app's range is only known to be accepted by the one room that
+  stores it.
+
+  A new `level_max` attribute says what 100% on a given fan actually asks
+  for, since that is no longer the same figure on every room.
 - **Diagnostics published the device's MAC address and IP in clear.**
   `async_redact_data` matches keys exactly, and this device's address
   arrives under two spellings - `MAC`/`IP` from the discovery payload,

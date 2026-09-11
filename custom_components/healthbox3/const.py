@@ -222,10 +222,21 @@ SENSOR_TYPE_VOC = "indoor volatile organic compounds"
 SENSOR_TYPE_AQI = "indoor air quality index"
 SENSOR_TYPE_GLOBAL_AQI = "global air quality index"
 
-# Boost level is a percentage of a room's nominal flow rate; 10-200% is the
-# range offered by Renson's own app. The fan entity's percentage (0-100,
-# a hard requirement of HA's fan platform) is rescaled onto this range -
-# see fan.py's _level_to_percentage/_percentage_to_level.
+# Boost level is a percentage of a room's nominal flow rate. 10-200% is the
+# range Renson's own app offers, but it is not the device's own limit: a
+# real unit was found holding `default_level: 270` for its kitchen, which
+# is the French hygro B peak extraction rate (270% of a 50 m3/h nominal =
+# 135 m3/h) written in at commissioning. Clamped to 200, Home Assistant
+# could only ever ask that kitchen for 100 m3/h.
+#
+# So 200 is a floor for a room's ceiling, not the ceiling: each room's
+# real one is max(BOOST_LEVEL_MAX, its own device-reported default_level),
+# per coordinator.Healthbox3DataUpdateCoordinator.boost_level_max. The fan
+# entity's percentage (0-100, a hard requirement of HA's fan platform) is
+# rescaled onto that room's range - see fan.py's
+# _level_to_percentage/_percentage_to_level. Rooms whose default sits
+# inside 10-200%, which is all of them on hardware seen so far bar that
+# kitchen, keep exactly the scale they had.
 BOOST_LEVEL_MIN = 10.0
 BOOST_LEVEL_MAX = 200.0
 
