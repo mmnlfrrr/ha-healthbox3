@@ -248,6 +248,15 @@ const PORTS = {
 // the Renson app draws it. `step` is how far out each further branch is,
 // and it is the drawing's own width so the brackets butt up against each
 // other with no gap.
+// CSS anchor positioning, which lets the browser keep the hover panel
+// inside the card by flipping it. Detected rather than assumed: it is
+// recent enough that a Home Assistant user may well be on a browser
+// without it, and the fallback below is perfectly serviceable.
+const ANCHORED =
+  typeof CSS !== "undefined" &&
+  typeof CSS.supports === "function" &&
+  CSS.supports("position-area", "block-start");
+
 const outward = (side) =>
   side === "left" || side === "right" ? G.valve_side_w : G.valve_end_h;
 
@@ -381,20 +390,38 @@ class HealthboxCard extends HTMLElement {
 
   _tipElement() {
     // An HTML panel rather than an SVG <title>: it has to show the room's
-    // pictogram, which a native tooltip cannot do. Positioned in percent
-    // of the drawing, so no measuring - see _outlet.
-    return (
-      `<div class="hb3-tip" hidden style="position:absolute;z-index:1;` +
-      `transform:translate(-50%%,-115%%);pointer-events:none;white-space:nowrap;` +
-      `display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;` +
+    // pictogram, which a native tooltip cannot do.
+    //
+    // Where it goes is decided two ways. Given CSS anchor positioning,
+    // the browser places it against an anchor and flips it to the other
+    // side when it would spill out of the card - which matters for the
+    // outlets near an edge, and is not something a fixed offset can do.
+    // Without it, the panel is placed directly at the badge's position,
+    // which is known exactly (see _outlet) and needs no measuring, but
+    // always sits above.
+    const common =
+      `pointer-events:none;white-space:nowrap;display:flex;align-items:center;` +
+      `gap:6px;padding:6px 10px;border-radius:8px;font-size:13px;z-index:1;` +
       `background:var(--card-background-color,#fff);color:var(--primary-text-color);` +
       `box-shadow:var(--ha-card-box-shadow,0 2px 8px rgba(0,0,0,.25));` +
-      `border:1px solid var(--divider-color,rgba(127,127,127,.3));font-size:13px"></div>`
+      `border:1px solid var(--divider-color,rgba(127,127,127,.3));`;
+
+    const placement = ANCHORED
+      ? `position:absolute;position-anchor:--hb3-anchor;position-area:block-start;` +
+        `position-try-fallbacks:flip-block,flip-inline,flip-block flip-inline;`
+        + `margin:8px;`
+      : `position:absolute;transform:translate(-50%%,-115%%);`;
+
+    return (
+      `<div class="hb3-anchor" style="position:absolute;width:0;height:0;` +
+      `anchor-name:--hb3-anchor"></div>` +
+      `<div class="hb3-tip" hidden style="${placement}${common}"></div>`
     );
   }
 
   _bind(unit) {
     const tip = this.querySelector(".hb3-tip");
+    const anchor = this.querySelector(".hb3-anchor");
 
     this.querySelectorAll("[data-room]").forEach((node) => {
       const room = unit.rooms[Number(node.dataset.room)];
@@ -402,8 +429,12 @@ class HealthboxCard extends HTMLElement {
 
       const show = () => {
         tip.innerHTML = this._tipContent(room, node.dataset.label);
-        tip.style.left = `${node.dataset.left}%%`;
-        tip.style.top = `${node.dataset.top}%%`;
+        // One anchor, moved to the hovered badge, rather than an anchor
+        // name per outlet: the panel is single too, so a second one would
+        // never be pointed at.
+        const target = ANCHORED ? anchor : tip;
+        target.style.left = `${node.dataset.left}%%`;
+        target.style.top = `${node.dataset.top}%%`;
         tip.hidden = false;
       };
       const hide = () => {

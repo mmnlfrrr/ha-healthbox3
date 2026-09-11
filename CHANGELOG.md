@@ -45,7 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Renson app does: a numbered connection at each wired collector port and
   a cap everywhere else, with the unit centred. Hovering an outlet shows
   its room - pictogram, name, airflow, air quality, profile, boost - and
-  clicking it opens that room's more-info. Add it from the card picker;
+  clicking it opens that room's more-info. The hover panel is placed with
+  CSS anchor positioning where the browser has it, so it flips itself to
+  stay inside the card near an edge, and falls back to a fixed offset
+  where it does not. Add it from the card picker;
   the integration serves it, so there is no resource to register by hand.
 
   Nothing about it is per-install: the integration publishes the real

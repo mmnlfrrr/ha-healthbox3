@@ -291,6 +291,28 @@ def test_hover_panel_is_positioned_without_measuring_the_dom():
     assert "data-left=" in module and "data-top=" in module
 
 
+def test_hover_panel_uses_css_anchor_positioning_where_available():
+    """A percentage alone cannot keep the panel inside the card: an outlet
+    near an edge would push it out. CSS anchor positioning lets the
+    browser flip it to the other side instead.
+
+    Detected rather than assumed - it is recent enough that a Home
+    Assistant user may be on a browser without it - with the percentage
+    placement kept as the fallback. Both paths were exercised by running
+    the module with CSS.supports stubbed either way.
+    """
+    module = build_card_module()
+
+    assert 'CSS.supports("position-area", "block-start")' in module
+    assert "position-anchor:--hb3-anchor" in module
+    assert "anchor-name:--hb3-anchor" in module
+    # Flip on either axis, and on both at once for a corner.
+    assert "flip-block,flip-inline,flip-block flip-inline" in module
+    # The fallback is still there and still needs no measuring.
+    assert "translate(-50%%,-115%%)" in module.replace("%", "%%")
+    assert "const target = ANCHORED ? anchor : tip" in module
+
+
 def test_card_module_chains_branches_outward():
     """A split outlet's branches run end to end away from the unit, which
     is how the Renson installer app draws them - not fanned out along the
