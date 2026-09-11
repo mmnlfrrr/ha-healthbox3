@@ -12,12 +12,6 @@ which is the closest thing to an authority there is for this vocabulary
 - the terms a user already reads on their phone. Corrections from a
 native speaker are still welcome; the parts with no counterpart in the
 app remain best-effort.
-
-German (de.json) is best-effort throughout and has NOT been checked
-against Renson's German app: unlike French, no German screenshots or
-strings were available, so its vocabulary is standard German
-ventilation terminology rather than Renson's own words. Treat every
-label in it as a candidate for correction, not as sourced.
 """
 
 from __future__ import annotations
@@ -35,7 +29,6 @@ TRANSLATIONS_DIR = _HEALTHBOX3_DIR / "translations"
 TRANSLATIONS_EN_PATH = TRANSLATIONS_DIR / "en.json"
 TRANSLATIONS_NL_PATH = TRANSLATIONS_DIR / "nl.json"
 TRANSLATIONS_FR_PATH = TRANSLATIONS_DIR / "fr.json"
-TRANSLATIONS_DE_PATH = TRANSLATIONS_DIR / "de.json"
 
 # Every file that ships, so a language added on disk without being wired
 # into the checks below fails rather than drifting unnoticed.
@@ -43,7 +36,6 @@ TRANSLATION_PATHS = (
     TRANSLATIONS_EN_PATH,
     TRANSLATIONS_NL_PATH,
     TRANSLATIONS_FR_PATH,
-    TRANSLATIONS_DE_PATH,
 )
 
 
@@ -93,21 +85,11 @@ def test_translations_fr_matches_en_key_structure():
     )
 
 
-def test_translations_de_matches_en_key_structure():
-    """Same structural check again. It is worth noting what this cannot
-    say: that the German is right. The docstring above is explicit that
-    de.json is unsourced - a shape test is exactly as much as the suite
-    can offer for it.
-    """
-    assert _key_shape(_load_json(TRANSLATIONS_DE_PATH)) == _key_shape(
-        _load_json(TRANSLATIONS_EN_PATH)
-    )
-
-
 def test_every_translation_file_is_checked():
     """A language dropped into translations/ is shipped by Home Assistant
     whether or not any test looks at it. This ties the checks above to
-    what is actually on disk, so a new file arrives with them or fails.
+    what is actually on disk, so a language cannot arrive - or be dropped
+    again - without the checks following it.
     """
     assert set(TRANSLATIONS_DIR.glob("*.json")) == set(TRANSLATION_PATHS)
 

@@ -64,15 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **German** (`de.json`), the fourth language. Be aware of what it is not:
-  unlike French, it could not be checked against Renson's own German app -
-  no German screenshots or strings were available - so it uses standard
-  German ventilation terminology (`Volumenstrom`, `Lüftungsstufe`,
-  `Abluftdruck`) rather than Renson's own words, and every label in it
-  should be read as a candidate for correction. See
-  [Translations](README.md#translations). A test now ties the per-language
-  checks to the files actually on disk, so a fifth language cannot ship
-  unchecked.
+- A test tying the per-language translation checks to the files actually
+  on disk, so a language cannot be added - or dropped - without the checks
+  following it.
 - **A Healthbox card**, drawing the unit and its outlets the way the
   Renson app does: a numbered connection at each wired collector port and
   a cap everywhere else, with the unit centred. Hovering an outlet shows
