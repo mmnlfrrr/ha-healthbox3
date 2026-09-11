@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api import RoomCO2Demand
+from .api import Room, RoomCO2Demand
 from .const import (
     BREEZE_TEMP_MAX,
     BREEZE_TEMP_MIN,
@@ -24,7 +24,7 @@ from .const import (
     SILENT_REDUCTION_MIN,
 )
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
-from .entity import Healthbox3Entity, RoomRef, room_exists
+from .entity import Healthbox3Entity, RoomRef, async_setup_rooms, room_exists
 
 # Device-wide settings, changed rarely; nothing to throttle.
 PARALLEL_UPDATES = 0
@@ -50,13 +50,27 @@ async def async_setup_entry(
         Healthbox3BreezeTemperatureNumber(coordinator, serial),
         Healthbox3SilentReductionNumber(coordinator, serial),
     ]
-    for room in coordinator.data.healthbox.rooms:
-        room_decision = coordinator.data.room_decisions.get(room.id)
-        if room_decision is not None and room_decision.co2.enable:
-            entities.append(
-                Healthbox3RoomCO2ThresholdNumber(coordinator, serial, room.id, room.name)
-            )
     async_add_entities(entities)
+    async_setup_rooms(
+        entry,
+        async_add_entities,
+        lambda room: _room_numbers(coordinator, serial, room),
+    )
+
+
+def _room_numbers(
+    coordinator: Healthbox3DataUpdateCoordinator, serial: str, room: Room
+) -> list[Healthbox3Entity]:
+    """Return the numbers one room warrants.
+
+    Only rooms whose CO2 demand control is actually enabled get a
+    threshold - a room the device does not regulate on CO2 has no
+    threshold to set.
+    """
+    room_decision = coordinator.data.room_decisions.get(room.id)
+    if room_decision is None or not room_decision.co2.enable:
+        return []
+    return [Healthbox3RoomCO2ThresholdNumber(coordinator, serial, room.id, room.name)]
 
 
 class Healthbox3GlobalMinimumNumber(Healthbox3Entity, NumberEntity):

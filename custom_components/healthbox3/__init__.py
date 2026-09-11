@@ -10,6 +10,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import Healthbox3ApiClient, Healthbox3ConnectionError, Healthbox3Error
 from .card import async_register as async_register_card
+from .const import DOMAIN
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
 from .entity import unit_device_info
 from .icon_set import async_register as async_register_icon_set
@@ -98,3 +99,29 @@ async def _async_reload_entry(
 async def async_unload_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    entry: Healthbox3ConfigEntry,
+    device: dr.DeviceEntry,
+) -> bool:
+    """Allow deleting the device of a room the unit no longer reports.
+
+    Without this hook Home Assistant refuses every deletion, and a vent
+    that has been physically removed leaves a device behind for good, with
+    its entities stuck on unavailable and a Delete button that does
+    nothing. The device is the only thing the user can act on, so being
+    unable to act on it is the whole problem.
+
+    Live rooms - and the unit itself - are refused: deleting one of those
+    would only have it recreated on the next poll, which reads as the
+    button being broken.
+    """
+    coordinator = entry.runtime_data
+    serial = coordinator.data.healthbox.serial
+    live = {(DOMAIN, serial)} | {
+        (DOMAIN, f"{serial}_room{room.id}")
+        for room in coordinator.data.healthbox.rooms
+    }
+    return not (device.identifiers & live)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 from typing import override
 
 from homeassistant.components.time import TimeEntity
@@ -13,8 +14,33 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
 from .entity import Healthbox3Entity
 
+_LOGGER = logging.getLogger(__name__)
+
 # Device-wide settings, changed rarely; nothing to throttle.
 PARALLEL_UPDATES = 0
+
+
+def _parse_time(value: object) -> datetime.time | None:
+    """Return `value` as a time of day, or None if it is not one.
+
+    The wire format is "HH:MM:SS" and real hardware has only ever sent
+    that, but `datetime.time.fromisoformat` raises on anything else -
+    TypeError on a non-string, ValueError on a malformed one - and an
+    exception raised from `native_value` does not degrade gracefully: Home
+    Assistant fails to add the entity at all, with a traceback in the log
+    and no silent-schedule control anywhere in the UI.
+
+    "Unknown" is the honest reading for a value the device sent that this
+    integration cannot make sense of, and it leaves the rest of the
+    platform working.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.time.fromisoformat(value)
+    except ValueError:
+        _LOGGER.debug("Ignoring unparseable silent schedule time %r", value)
+        return None
 
 
 async def async_setup_entry(
@@ -71,7 +97,7 @@ class Healthbox3SilentStartTime(Healthbox3Entity, TimeEntity):
         decision = self.coordinator.data.decision
         if decision is None:
             return None
-        return datetime.time.fromisoformat(decision.silent.start_time)
+        return _parse_time(decision.silent.start_time)
 
     @override
     async def async_set_value(self, value: datetime.time) -> None:
@@ -116,7 +142,7 @@ class Healthbox3SilentStopTime(Healthbox3Entity, TimeEntity):
         decision = self.coordinator.data.decision
         if decision is None:
             return None
-        return datetime.time.fromisoformat(decision.silent.stop_time)
+        return _parse_time(decision.silent.stop_time)
 
     @override
     async def async_set_value(self, value: datetime.time) -> None:

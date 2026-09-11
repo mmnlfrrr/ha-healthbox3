@@ -14,7 +14,8 @@ from pathlib import Path
 
 from custom_components.healthbox3.api import AQI_QUALIFICATION_LEVELS
 from custom_components.healthbox3.const import PROFILES
-from custom_components.healthbox3.sensor import DEVICE_SENSOR_META, ROOM_SENSOR_META
+from custom_components.healthbox3.sensor_room import ROOM_SENSOR_META
+from custom_components.healthbox3.sensor_unit import DEVICE_SENSOR_META
 
 ICONS_PATH = (
     Path(__file__).parent.parent / "custom_components" / "healthbox3" / "icons.json"

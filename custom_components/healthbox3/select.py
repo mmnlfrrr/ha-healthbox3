@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .api import Room
 from .const import DOMAIN, PROFILES
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
-from .entity import Healthbox3Entity, RoomRef
+from .entity import Healthbox3Entity, RoomRef, async_setup_rooms
 
 # Profile changes are a low-frequency user action against a single small
 # device; the coordinator (not per-entity polling) owns concurrency for
@@ -34,9 +34,12 @@ async def async_setup_entry(
         return
 
     serial = coordinator.data.healthbox.serial
-    async_add_entities(
-        Healthbox3ProfileSelect(coordinator, serial, room.id, room.name)
-        for room in coordinator.data.healthbox.rooms
+    async_setup_rooms(
+        entry,
+        async_add_entities,
+        lambda room: [
+            Healthbox3ProfileSelect(coordinator, serial, room.id, room.name)
+        ],
     )
 
 

@@ -28,14 +28,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .api import BoostStatus
+from .api import BoostStatus, Room
 from .const import BOOST_DURATION_PRESETS, BOOST_LEVEL_MAX, BOOST_LEVEL_MIN, DOMAIN
 from .coordinator import (
     BoostParams,
     Healthbox3ConfigEntry,
     Healthbox3DataUpdateCoordinator,
 )
-from .entity import Healthbox3Entity, RoomRef, room_exists
+from .entity import Healthbox3Entity, RoomRef, async_setup_rooms, room_exists
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -94,35 +94,41 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     serial = coordinator.data.healthbox.serial
 
-    entities: list[Healthbox3Entity] = []
-    for room in coordinator.data.healthbox.rooms:
-        params = coordinator.boost_params.setdefault(
-            room.id, BoostParams(level=100.0, timeout=900)
-        )
-        entities.append(
-            Healthbox3RoomBoostFan(
+    async_add_entities(
+        [
+            Healthbox3AllBoostFan(
                 coordinator,
                 serial,
-                params=params,
-                unique_id=f"{serial}_room{room.id}_boost",
-                translation_key="room_boost",
-                room_name=room.name,
-                room_id=room.id,
+                params=coordinator.boost_all_params,
+                unique_id=f"{serial}_boost_all",
+                translation_key="boost_all",
+                room=None,
             )
-        )
-
-    entities.append(
-        Healthbox3AllBoostFan(
-            coordinator,
-            serial,
-            params=coordinator.boost_all_params,
-            unique_id=f"{serial}_boost_all",
-            translation_key="boost_all",
-            room=None,
-        )
+        ]
+    )
+    async_setup_rooms(
+        entry,
+        async_add_entities,
+        lambda room: [_room_boost_fan(coordinator, serial, room)],
     )
 
-    async_add_entities(entities)
+
+def _room_boost_fan(
+    coordinator: Healthbox3DataUpdateCoordinator, serial: str, room: Room
+) -> Healthbox3RoomBoostFan:
+    """Return the boost fan for one room, seeding its level/duration."""
+    params = coordinator.boost_params.setdefault(
+        room.id, BoostParams(level=100.0, timeout=900)
+    )
+    return Healthbox3RoomBoostFan(
+        coordinator,
+        serial,
+        params=params,
+        unique_id=f"{serial}_room{room.id}_boost",
+        translation_key="room_boost",
+        room_name=room.name,
+        room_id=room.id,
+    )
 
 
 class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):

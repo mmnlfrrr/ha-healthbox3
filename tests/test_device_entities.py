@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import copy
 import logging
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from custom_components.healthbox3 import api as api_mod
+from custom_components.healthbox3 import async_remove_config_entry_device
 from custom_components.healthbox3.const import DOMAIN, ENERGY_MAX_GAP_SECONDS
 
 from .conftest import setup_integration
@@ -545,7 +546,7 @@ async def test_energy_sensor_integrates_power_over_time(
 
     clock = [1000.0]
     with patch(
-        "custom_components.healthbox3.sensor.monotonic", side_effect=lambda: clock[0]
+        "custom_components.healthbox3.sensor_unit.monotonic", side_effect=lambda: clock[0]
     ):
         await _refresh_with_power(hass, entry, 3600.0)  # anchor, adds nothing
         clock[0] += ENERGY_MAX_GAP_SECONDS
@@ -575,7 +576,7 @@ async def test_energy_sensor_uses_the_average_of_both_readings(
 
     clock = [1000.0]
     with patch(
-        "custom_components.healthbox3.sensor.monotonic", side_effect=lambda: clock[0]
+        "custom_components.healthbox3.sensor_unit.monotonic", side_effect=lambda: clock[0]
     ):
         await _refresh_with_power(hass, entry, 0.0)
         clock[0] += ENERGY_MAX_GAP_SECONDS
@@ -602,7 +603,7 @@ async def test_energy_sensor_skips_gaps_longer_than_the_cap(
 
     clock = [1000.0]
     with patch(
-        "custom_components.healthbox3.sensor.monotonic", side_effect=lambda: clock[0]
+        "custom_components.healthbox3.sensor_unit.monotonic", side_effect=lambda: clock[0]
     ):
         await _refresh_with_power(hass, entry, 3600.0)
         clock[0] += ENERGY_MAX_GAP_SECONDS + 1
@@ -631,7 +632,7 @@ async def test_energy_sensor_never_pairs_across_an_outage(
 
     clock = [1000.0]
     with patch(
-        "custom_components.healthbox3.sensor.monotonic", side_effect=lambda: clock[0]
+        "custom_components.healthbox3.sensor_unit.monotonic", side_effect=lambda: clock[0]
     ):
         await _refresh_with_power(hass, entry, 3600.0)
         clock[0] += 60.0
@@ -723,3 +724,95 @@ async def test_setup_logs_no_deprecation_warning(
         and "deprecated" in record.getMessage()
     ]
     assert not reports
+
+
+async def test_a_room_added_later_gets_its_entities_without_a_reload(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """A vent added in Renson's own app appears in the next `data/current`.
+
+    Until this worked, it stayed invisible until somebody thought to reload
+    the integration - with nothing anywhere hinting that a reload was what
+    was needed.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+    before = len(hass.states.async_entity_ids())
+
+    extra = copy.deepcopy(v2_data)
+    new_room = copy.deepcopy(extra.rooms[0])
+    new_room.id = 99
+    new_room.name = "Cellar"
+    extra.rooms.append(new_room)
+    mock_api_client.async_get_v2_data_current = AsyncMock(return_value=extra)
+
+    await hass.config_entries.async_entries(DOMAIN)[0].runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    assert len(hass.states.async_entity_ids()) > before
+    assert _state(hass, "fan", v2_data.serial, "room99_boost") is not None
+    assert _state(hass, "select", v2_data.serial, "room99_profile") is not None
+
+
+async def test_a_room_seen_twice_is_not_added_twice(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The listener runs on every coordinator update, so the guard against
+    re-adding a room it already knows is what stops it piling up duplicate
+    entities every 30 seconds."""
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+    before = len(hass.states.async_entity_ids())
+
+    coordinator = hass.config_entries.async_entries(DOMAIN)[0].runtime_data
+    for _ in range(3):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    assert len(hass.states.async_entity_ids()) == before
+
+
+async def test_only_a_vanished_room_device_can_be_deleted(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The device is the only thing a user can act on when a vent is
+    physically removed, so being unable to act on it is the whole problem.
+
+    The unit and any still-reported room are refused: deleting one of those
+    only has it recreated on the next poll, which reads as a broken button.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    unit = _unit_device_entry(hass, entry, v2_data.serial)
+    registry = dr.async_get(hass)
+    rooms = [
+        device
+        for device in dr.async_entries_for_config_entry(registry, entry.entry_id)
+        if device.id != unit.id
+    ]
+
+    assert await async_remove_config_entry_device(hass, entry, unit) is False
+    assert await async_remove_config_entry_device(hass, entry, rooms[0]) is False
+
+    stale = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, f"{v2_data.serial}_room404")},
+        name="Removed vent",
+    )
+    assert await async_remove_config_entry_device(hass, entry, stale) is True

@@ -18,17 +18,25 @@ already carries it.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import (
     CONNECTION_NETWORK_MAC,
     DeviceInfo,
     format_mac,
 )
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api import Room
 from .const import DOMAIN
-from .coordinator import Healthbox3DataUpdateCoordinator
+from .coordinator import (
+    Healthbox3ConfigEntry,
+    Healthbox3DataUpdateCoordinator,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -63,6 +71,46 @@ class Healthbox3Entity(CoordinatorEntity[Healthbox3DataUpdateCoordinator]):
             if room is None
             else _room_device(coordinator, serial, room)
         )
+
+
+def async_setup_rooms(
+    entry: Healthbox3ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+    build: Callable[[Room], Iterable[Entity]],
+) -> None:
+    """Add `build(room)`'s entities for every room, now and as rooms appear.
+
+    Rooms are not fixed for the life of a config entry. A vent added in
+    Renson's own app shows up in the next `data/current`, and until this
+    existed it stayed invisible until someone thought to reload the
+    integration - with no hint anywhere that a reload was what was needed.
+
+    Only genuinely new room ids are built, so this is safe to call on
+    every coordinator update: rooms that disappear are deliberately not
+    torn down here (their entities go unavailable through the normal
+    `available` checks, which is the honest state for a vent that has
+    stopped being reported), and a room that comes back keeps the entities
+    - and therefore the history - it already had.
+    """
+    coordinator = entry.runtime_data
+    known: set[int] = set()
+
+    @callback
+    def _add_new_rooms() -> None:
+        new = [
+            room
+            for room in coordinator.data.healthbox.rooms
+            if room.id not in known
+        ]
+        if not new:
+            return
+        known.update(room.id for room in new)
+        async_add_entities(
+            entity for room in new for entity in build(room)
+        )
+
+    _add_new_rooms()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_rooms))
 
 
 def unit_device_info(
