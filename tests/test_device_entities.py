@@ -166,6 +166,27 @@ async def test_room_duct_sensors_not_created_without_a_valve_parameter(
     assert _state(hass, "sensor", stripped.serial, "room1_valve_port") is None
 
 
+async def test_room_symbol_prefers_the_device_icon_over_the_room_type(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The fixture unit ships a room whose type and icon disagree - type
+    "BedRoom", icon "StudioFlat". Renson's own UIs draw the icon, so a
+    dashboard templating a picture off the type would show the wrong one
+    on exactly that kind of room. Room 3 is that room; room 5 is a BedRoom
+    with a blank icon, which is where the type is all there is.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    assert _state(hass, "sensor", v2_data.serial, "room3_symbol").state == "StudioFlat"
+    assert _state(hass, "sensor", v2_data.serial, "room5_symbol").state == "BedRoom"
+
+
 async def test_legislation_code_sensor_created_only_for_rooms_that_report_one(
     hass, mock_api_client, v2_data, boost_status
 ):

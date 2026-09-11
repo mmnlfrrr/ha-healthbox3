@@ -35,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Room symbol` sensor per room (diagnostic): which pictogram the device
+  itself picked for the room. Lets a dashboard illustrate each room without
+  the layout being written by hand per install - Home Assistant has no
+  per-device icon, so a card is the only place a picture can appear, and
+  this gives the card something to template off.
+
+  Taken from the device's `icon` parameter, falling back to the room's
+  `type` when it's blank. The two are different fields and can disagree: a
+  room typed `BedRoom` can carry the `StudioFlat` icon, which Renson's own
+  UIs draw - so a card templating off the type would be wrong on exactly
+  those rooms. Reported in Renson's spelling, not translated into `mdi:`
+  names, which would be a guess for every value beyond the handful seen.
 - `Legislation code` sensor per room (diagnostic): the room's regulatory
   destination code (`C16`, `C22`, `C3`…), which is what the ventilation
   standard classes the room as and therefore what set its nominal flow at

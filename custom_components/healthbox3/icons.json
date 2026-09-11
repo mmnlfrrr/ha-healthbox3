@@ -107,6 +107,9 @@
       "room_legislation_code": {
         "default": "mdi:scale-balance"
       },
+      "room_symbol": {
+        "default": "mdi:floor-plan"
+      },
       "room_conductance": {
         "default": "mdi:pipe-valve"
       },

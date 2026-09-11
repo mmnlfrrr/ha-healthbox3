@@ -188,6 +188,9 @@
       "room_legislation_code": {
         "name": "Code réglementaire"
       },
+      "room_symbol": {
+        "name": "Symbole de pièce"
+      },
       "room_conductance": {
         "name": "Conductance de la gaine"
       },

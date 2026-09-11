@@ -130,6 +130,17 @@ ROOM_PARAM_VALVE = "valve"
 # than assumed universal.
 ROOM_PARAM_LEGISLATION_CODE = "legislation_code"
 
+# Which pictogram the device itself picked for a room. Renson's own UIs
+# ship a sprite of `room-types-*` symbols and select one per room from
+# this parameter - NOT from the room's `type`, which is a separate field
+# that can disagree: docs/fixtures/v2-data-current.json has a room with
+# type "BedRoom" and icon "StudioFlat". Mapping a picture from `type`
+# would therefore show the wrong one on exactly those rooms.
+#
+# Frequently blank on real hardware (3 of 7 rooms in that same fixture),
+# in which case `type` is the only thing left to go on.
+ROOM_PARAM_ICON = "icon"
+
 # Both blocks nest their actual value one level deeper under a "0" key
 # (conductance.c_collector.<port>.c_ij.0, cmode_pressures.p_collector.
 # <port>.0). Confirmed on real hardware for all 7 ports; no port has ever

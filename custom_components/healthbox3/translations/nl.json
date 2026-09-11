@@ -188,6 +188,9 @@
       "room_legislation_code": {
         "name": "Wetgevingscode"
       },
+      "room_symbol": {
+        "name": "Kamersymbool"
+      },
       "room_conductance": {
         "name": "Kanaalconductantie"
       },

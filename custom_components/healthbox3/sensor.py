@@ -35,6 +35,7 @@ from .api import (
     Sensor,
     categorize_aqi_quality,
     room_legislation_code,
+    room_symbol,
     room_valve_port,
 )
 from .const import (
@@ -315,6 +316,10 @@ async def async_setup_entry(
                 Healthbox3RoomNominalAirflowSensor(
                     coordinator, serial, room.id, room.name
                 )
+            )
+        if room_symbol(room) is not None:
+            entities.append(
+                Healthbox3RoomSymbolSensor(coordinator, serial, room.id, room.name)
             )
         # Reported by some units and not others (absent from the test
         # fixture, present in a real capture), so it's per-room optional
@@ -911,6 +916,54 @@ class Healthbox3RoomNominalAirflowSensor(_Healthbox3RoomValueSensor):
     @override
     def _room_value(self, room: Room) -> float | None:
         return _room_nominal_flow(room)
+
+
+class Healthbox3RoomSymbolSensor(Healthbox3Entity, SensorEntity):
+    """Which pictogram the device picked for a room, e.g. "BathRoom".
+
+    Exists so a dashboard can illustrate each room without the layout
+    being written by hand per install: a card templates the room's
+    picture off this state. Home Assistant has no per-device icon, so a
+    card is the only place a real picture can appear - this reports the
+    key, it doesn't ship the artwork.
+
+    Reports Renson's own spelling rather than a Home Assistant icon name.
+    Translating it into `mdi:` icons here would be a guess dressed up as a
+    fact for every value beyond the handful this unit reports.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "room_symbol"
+
+    def __init__(
+        self,
+        coordinator: Healthbox3DataUpdateCoordinator,
+        serial: str,
+        room_id: int,
+        room_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator, serial, room=RoomRef(id=room_id, name=room_name)
+        )
+        self._room_id = room_id
+        self._attr_unique_id = f"{serial}_room{room_id}_symbol"
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Return whether this room still resolves to a symbol."""
+        return super().available and self.native_value is not None
+
+    @property
+    @override
+    def native_value(self) -> str | None:
+        """Return the room's symbol key, if any."""
+        room = next(
+            (r for r in self.coordinator.data.healthbox.rooms if r.id == self._room_id),
+            None,
+        )
+        return room_symbol(room) if room is not None else None
 
 
 class Healthbox3RoomLegislationCodeSensor(Healthbox3Entity, SensorEntity):

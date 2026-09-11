@@ -188,6 +188,9 @@
       "room_legislation_code": {
         "name": "Legislation code"
       },
+      "room_symbol": {
+        "name": "Room symbol"
+      },
       "room_conductance": {
         "name": "Duct conductance"
       },

@@ -32,6 +32,7 @@ from .const import (
     DISCOVERY_PORT,
     DISCOVERY_TIMEOUT,
     PROFILES,
+    ROOM_PARAM_ICON,
     ROOM_PARAM_LEGISLATION_CODE,
     ROOM_PARAM_VALVE,
     SILENT_WEEKDAYS,
@@ -546,6 +547,27 @@ def _parse_wifi(raw: dict[str, Any]) -> WifiStatus:
         internet_connection=internet if isinstance(internet, bool) else None,
         connection_error=_optional_str(raw.get("connection_error")),
     )
+
+
+def room_symbol(room: Room) -> str | None:
+    """Return the pictogram key the device picked for a room.
+
+    Prefers the device's own `icon` parameter and falls back to the room's
+    `type` when it's blank - which it often is. The two are different
+    fields and can disagree (a "BedRoom" carrying the "StudioFlat" icon),
+    so `icon` wins wherever it says anything at all.
+
+    Returned verbatim, in Renson's own spelling. No attempt is made to
+    guarantee that a matching symbol exists: `type` values like
+    "ClosedKitchen" have no single counterpart in Renson's sprite, and
+    inventing a substitution here would hide that from the caller instead
+    of letting it decide.
+    """
+    parameter = room.parameters.get(ROOM_PARAM_ICON)
+    if parameter is not None and isinstance(parameter.value, str):
+        if icon := parameter.value.strip():
+            return icon
+    return room.type.strip() or None
 
 
 def room_legislation_code(room: Room) -> str | None:
