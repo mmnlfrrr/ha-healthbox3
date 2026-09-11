@@ -396,7 +396,7 @@ class HealthboxCard extends HTMLElement {
     this.innerHTML =
       `<ha-card header="${unit.name}">` +
       `<div style="padding:8px 8px 16px;color:var(--primary-text-color)">` +
-      `<svg viewBox="0 130 540 290" style="width:100%%;height:auto">${parts.join("")}</svg>` +
+      `<svg viewBox="${this._viewBox(byPort)}" style="width:100%%;height:auto">${parts.join("")}</svg>` +
       `</div></ha-card>`;
 
     this.querySelectorAll("[data-entity]").forEach((node) => {
@@ -407,6 +407,56 @@ class HealthboxCard extends HTMLElement {
         this.dispatchEvent(event);
       });
     });
+  }
+
+  _viewBox(byPort) {
+    // Computed, not fixed: a chain grows the drawing in whichever
+    // direction it runs, and a fixed box silently clipped anything on the
+    // top or bottom edge - two branches there already overflowed it.
+    // Starts from the casing plus its exhaust, then grows for every chain
+    // and every label actually drawn.
+    // Every port position draws something - a connection or a blanking
+    // cap - so one valve depth on each side is always occupied, whether
+    // or not a room is wired there. Counting only the wired ones cut the
+    // caps off the edges that had none.
+    let minX = G.base_x - G.valve_side_w;
+    let maxX = G.base_x + G.base_size + G.valve_side_w;
+    let minY = Math.min(G.base_y - G.valve_end_h, G.exhaust_y);
+    let maxY = G.base_y + G.base_size + G.valve_end_h;
+
+    for (const [port, rooms] of byPort) {
+      const [side, a] = PORTS[port];
+      const reach = outward(side) * rooms.length;
+      const split = rooms.length > 1;
+      // A label needs room along the axis it runs and across it, and the
+      // two are not the same measure - the first mistake here was
+      // reserving a text *width* above a top outlet, which left a band of
+      // empty space instead.
+      const wide = split
+        ? 14
+        : 26 + this._textWidth(rooms[0].name) + (this._icons?.[port] ? 19 : 0);
+      const tall = split ? 14 : 52;
+
+      if (side === "left") {
+        minX = Math.min(minX, G.base_x - reach - wide);
+      } else if (side === "right") {
+        maxX = Math.max(maxX, G.base_x + G.base_size + reach + wide);
+      } else {
+        // Top and bottom labels are centred on the outlet, so they spread
+        // both ways across the drawing as well as away from it.
+        minX = Math.min(minX, a - wide / 2);
+        maxX = Math.max(maxX, a + wide / 2);
+        if (side === "top") minY = Math.min(minY, G.base_y - reach - tall);
+        else maxY = Math.max(maxY, G.base_y + G.base_size + reach + tall);
+      }
+    }
+
+    const margin = 8;
+    minX -= margin;
+    minY -= margin;
+    maxX += margin;
+    maxY += margin;
+    return `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
   }
 
   _outlet(port, rooms) {

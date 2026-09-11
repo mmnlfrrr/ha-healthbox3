@@ -243,6 +243,27 @@ def test_card_module_chains_branches_outward():
     assert "outward(side) * branch" in module
 
 
+def test_card_module_sizes_its_own_viewport():
+    """A chain grows the drawing in whichever direction it runs, so the
+    viewport is computed from the layout rather than fixed.
+
+    It was fixed at first, and two branches on the bottom edge already
+    overflowed it - the drawing was silently cut off. Two mistakes were
+    made fixing it, both caught by rasterising: reserving a text *width*
+    above a top outlet (a band of empty space), and measuring only the
+    wired ports, which cut the blanking caps off the other edges.
+    """
+    module = build_card_module()
+
+    assert 'viewBox="${this._viewBox(byPort)}"' in module
+    # Every position draws something, wired or capped.
+    assert "G.base_x - G.valve_side_w" in module
+    assert "G.base_y + G.base_size + G.valve_end_h" in module
+    # Along the axis and across it are different measures.
+    assert "const wide = split" in module
+    assert "const tall = split" in module
+
+
 def test_layout_is_empty_before_any_unit_is_set_up(hass):
     """The view answers on a bare install too, rather than raising."""
     assert build_layout(hass) == {"units": []}
