@@ -583,6 +583,11 @@ async def test_key_invalid_downgrades_to_v1_and_starts_reauth(
     assert coordinator.use_v2 is False
     assert coordinator.last_update_success is True
 
+    # `async_start_reauth` schedules the flow as a task rather than creating
+    # it inline, so it does not exist yet unless the loop gets a turn first.
+    # Without this the assertion below passes when the test runs alone and
+    # fails inside the full suite, purely on timing.
+    await hass.async_block_till_done()
     progress = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
     assert any(f["context"].get("source") == SOURCE_REAUTH for f in progress)
 
