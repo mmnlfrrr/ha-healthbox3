@@ -116,6 +116,115 @@ async def test_layout_omits_entities_a_room_does_not_have(
     assert "aqi_level" not in room["entities"]
 
 
+async def test_a_split_outlet_keeps_both_rooms_on_the_same_port(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """One physical outlet can feed several rooms. They must all survive
+    into the layout, in a stable order, or the card would draw one and
+    silently drop the rest.
+    """
+    split = copy.deepcopy(v2_data)
+    for room_id in (2, 3):
+        next(r for r in split.rooms if r.id == room_id).parameters["valve"].value = "1"
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=split.serial,
+        healthbox_data=split,
+        boost_status=boost_status,
+    )
+
+    rooms = build_layout(hass)["units"][0]["rooms"]
+    on_port_1 = [room["id"] for room in rooms if room["port"] == 1]
+    assert on_port_1 == [1, 2, 3]
+
+
+async def test_an_error_is_pinned_to_an_outlet_only_when_it_names_a_port(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """`/v1/error` says nothing about what its association id identifies,
+    so only an id that is literally one of this unit's port numbers marks
+    a room. Everything else is counted against the unit.
+    """
+    errors = [
+        api_mod.DeviceError(
+            code="E042",
+            time="2026-01-15T08:30:00Z",
+            description="on port 2",
+            association_id="2",
+            severity="critical",
+            category="Fan and main PCB",
+        ),
+        api_mod.DeviceError(
+            code="E043",
+            time="2026-01-15T08:30:00Z",
+            description="opaque",
+            association_id="abc123",
+            severity="warning",
+            category="Power",
+        ),
+    ]
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        errors=errors,
+    )
+
+    unit = build_layout(hass)["units"][0]
+    faulted = {room["port"] for room in unit["rooms"] if room["error"]}
+
+    assert faulted == {2}
+    assert unit["unattributed_errors"] == 1
+
+
+async def test_a_port_number_that_is_not_wired_is_not_attributed(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """A numeric association id is only a port if this unit actually has
+    that port; otherwise it is as opaque as any other id.
+    """
+    errors = [
+        api_mod.DeviceError(
+            code="E042",
+            time="2026-01-15T08:30:00Z",
+            description="port 11",
+            association_id="11",
+            severity="critical",
+            category="Power",
+        )
+    ]
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        errors=errors,
+    )
+
+    unit = build_layout(hass)["units"][0]
+
+    assert not any(room["error"] for room in unit["rooms"])
+    assert unit["unattributed_errors"] == 1
+
+
+def test_card_module_draws_tooltips_and_branch_labels():
+    """The two things that keep a split outlet readable: details move into
+    an SVG <title>, and branches are numbered with Renson's dot notation.
+    """
+    module = build_card_module()
+
+    assert "<title>" in module
+    assert "${port}.${i + 1}" in module
+    assert "valve_manual_error" in module
+
+
 def test_layout_is_empty_before_any_unit_is_set_up(hass):
     """The view answers on a bare install too, rather than raising."""
     assert build_layout(hass) == {"units": []}

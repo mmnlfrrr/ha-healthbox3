@@ -30,7 +30,7 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from .api import room_symbol, room_valve_port
+from .api import DeviceError, HealthboxData, room_symbol, room_valve_port
 from .const import DOMAIN
 from .scene_assets import SCENE_ASSETS, SCENE_GEOMETRY
 from .zone_icons import FALLBACK_ICON, ICON_PREFIX, ROOM_SYMBOL_TO_ICON
@@ -72,6 +72,45 @@ def _room_entities(
     return found
 
 
+def _attribute_errors(
+    errors: list[DeviceError], healthbox: HealthboxData
+) -> tuple[set[int], int]:
+    """Split reported errors into "this outlet" and "somewhere else".
+
+    `/v1/error` gives an `association_id` and nothing that says what it
+    identifies. The Renson SDK's own error model carries a context type
+    beside it - GLOBAL, DEVICE, COLLECTOR and the like - but the local
+    endpoint does not return that field, and no real unit has ever been
+    observed reporting an error at all, so there is no capture to settle
+    it against.
+
+    So the rule here is deliberately one that cannot mis-attribute: an
+    error is pinned to an outlet only when its association id is exactly
+    one of this unit's own collector port numbers. Anything else - an
+    opaque id, a serial, a sensor id - is counted as unattributed and
+    shown on the unit rather than blamed on a room. The cost of being
+    wrong the other way (marking the wrong duct faulty) is much higher
+    than showing a fault without saying where.
+    """
+    ports = {
+        port
+        for port in (room_valve_port(room) for room in healthbox.rooms)
+        if port is not None
+    }
+    faulted: set[int] = set()
+    unattributed = 0
+    for error in errors:
+        try:
+            port = int(error.association_id)
+        except (TypeError, ValueError):
+            port = None
+        if port is not None and port in ports:
+            faulted.add(port)
+        else:
+            unattributed += 1
+    return faulted, unattributed
+
+
 def build_layout(hass: HomeAssistant) -> dict[str, Any]:
     """Return every configured unit's topology."""
     registry = er.async_get(hass)
@@ -83,6 +122,8 @@ def build_layout(hass: HomeAssistant) -> dict[str, Any]:
             continue
         healthbox = coordinator.data.healthbox
         serial = healthbox.serial
+
+        faulted, unattributed = _attribute_errors(coordinator.data.errors, healthbox)
 
         rooms = []
         for room in healthbox.rooms:
@@ -101,6 +142,7 @@ def build_layout(hass: HomeAssistant) -> dict[str, Any]:
                         ICON_PREFIX,
                         ROOM_SYMBOL_TO_ICON.get(symbol or "", FALLBACK_ICON),
                     ),
+                    "error": port in faulted,
                     "entities": _room_entities(registry, serial, room.id),
                 }
             )
@@ -109,7 +151,11 @@ def build_layout(hass: HomeAssistant) -> dict[str, Any]:
             {
                 "serial": serial,
                 "name": healthbox.description,
-                "rooms": sorted(rooms, key=lambda room: room["port"]),
+                # Sorted by port, then by room id, so a split outlet's
+                # branches are numbered in a stable order rather than
+                # shuffling between refreshes.
+                "rooms": sorted(rooms, key=lambda room: (room["port"], room["id"])),
+                "unattributed_errors": unattributed,
             }
         )
 
@@ -296,32 +342,50 @@ class HealthboxCard extends HTMLElement {
       return;
     }
 
-    const byPort = new Map(unit.rooms.map((r) => [r.port, r]));
+    // A physical outlet can be split into several branches, each its own
+    // room, so ports hold a list. One room on a port keeps the plain
+    // number; several get dotted branch labels, the way Renson writes
+    // them: 1.1, 1.2, 1.3.
+    const byPort = new Map();
+    for (const room of unit.rooms) {
+      if (!byPort.has(room.port)) byPort.set(room.port, []);
+      byPort.get(room.port).push(room);
+    }
+
     const parts = [
       `<g transform="translate(${G.exhaust_x},${G.exhaust_y})">${ASSETS.healthbox_exhaust}</g>`,
       `<g transform="translate(${G.base_x},${G.base_y})">${ASSETS.healthbox_base}</g>`,
     ];
 
     for (const port of Object.keys(PORTS).map(Number)) {
-      const room = byPort.get(port);
-      parts.push(place(port, room ? "valve_manual" : "valve_closed"));
+      const rooms = byPort.get(port);
+      if (!rooms) {
+        parts.push(place(port, "valve_closed"));
+        continue;
+      }
+      parts.push(
+        place(port, rooms.some((r) => r.error) ? "valve_manual_error" : "valve_manual"),
+      );
     }
 
-    for (const room of unit.rooms) {
-      const [cx, cy] = badgeAt(room.port);
-      const [side] = PORTS[room.port];
+    for (const [port, rooms] of byPort) {
+      parts.push(this._outlet(port, rooms));
+    }
+
+    if (unit.unattributed_errors) {
+      // Parked in the corner rather than under the unit: down there it
+      // reads as belonging to whichever room's figures it lands beside,
+      // and "not attributable to an outlet" is the whole point of it.
       parts.push(
-        `<circle cx="${cx}" cy="${cy}" r="12" fill="var(--card-background-color,#fff)"` +
-          ` stroke="currentColor" stroke-width="2"/>` +
-          `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"` +
-          ` font-size="14" fill="currentColor">${room.port}</text>`,
+        `<g><title>${unit.unattributed_errors} error(s) not attributable to an outlet</title>` +
+          `<text x="8" y="148" font-size="13" fill="var(--error-color,#db4437)">` +
+          `⚠ ${unit.unattributed_errors}</text></g>`,
       );
-      parts.push(this._callout(room, cx, cy, side));
     }
 
     this.innerHTML =
       `<ha-card header="${unit.name}">` +
-      `<div class="hb3" style="padding:8px 8px 16px;color:var(--primary-text-color)">` +
+      `<div style="padding:8px 8px 16px;color:var(--primary-text-color)">` +
       `<svg viewBox="0 130 540 290" style="width:100%%;height:auto">${parts.join("")}</svg>` +
       `</div></ha-card>`;
 
@@ -335,12 +399,80 @@ class HealthboxCard extends HTMLElement {
     });
   }
 
+  _outlet(port, rooms) {
+    const [cx, cy] = badgeAt(port);
+    const [side] = PORTS[port];
+    const split = rooms.length > 1;
+    // Branch badges fan out along the edge rather than stacking on the
+    // outlet, which is what would collide once a port carries three.
+    const spread = 26;
+    const axis = side === "left" || side === "right" ? "y" : "x";
+
+    return rooms
+      .map((room, i) => {
+        const shift = split ? (i - (rooms.length - 1) / 2) * spread : 0;
+        const bx = axis === "x" ? cx + shift : cx;
+        const by = axis === "y" ? cy + shift : cy;
+        const label = split ? `${port}.${i + 1}` : String(port);
+        const clickable = room.entities.airflow || room.entities.boost || "";
+        const colour = room.error ? "var(--error-color,#db4437)" : "currentColor";
+
+        return (
+          `<g data-entity="${clickable}">` +
+          `<title>${this._tooltip(room, label)}</title>` +
+          `<circle cx="${bx}" cy="${by}" r="${split ? 11 : 12}"` +
+          ` fill="var(--card-background-color,#fff)" stroke="${colour}" stroke-width="2"/>` +
+          `<text x="${bx}" y="${by}" text-anchor="middle" dominant-baseline="central"` +
+          ` font-size="${split ? 11 : 14}" fill="${colour}">${label}</text>` +
+          (split ? "" : this._callout(room, bx, by, side)) +
+          `</g>`
+        );
+      })
+      .join("");
+  }
+
+  _tooltip(room, label) {
+    // Everything the drawing can no longer afford to show. Kept as an SVG
+    // <title>, so it is the browser's own tooltip: no positioning code to
+    // get wrong, and screen readers announce it.
+    const lines = [`${label} · ${room.name}`];
+    const flow = this._state(room.entities.airflow);
+    const rate = this._state(room.entities.airflow_rate);
+    const aqi = this._state(room.entities.aqi_level);
+    const profile = this._state(room.entities.profile);
+    const boost = this._state(room.entities.boost);
+
+    if (flow || rate) {
+      const parts = [];
+      if (flow) parts.push(`${Math.round(Number(flow.state))}%%`);
+      if (rate) parts.push(`${Math.round(Number(rate.state))} m³/h`);
+      lines.push(parts.join(" · "));
+    }
+    if (aqi) lines.push(this._label(aqi));
+    if (profile) lines.push(this._label(profile));
+    if (boost && boost.state === "on") lines.push("Boost");
+    if (room.error) lines.push("⚠");
+    // Doubled on purpose: this module is a Python string, so a single
+    // backslash-n would become a real line break before the browser
+    // ever sees it, and the JavaScript string would not close.
+    return lines.join("\\n");
+  }
+
+  _label(state) {
+    // Whatever the frontend already shows for this state, so the tooltip
+    // speaks the user's language rather than the device's.
+    const attrs = state.attributes || {};
+    return this._hass.formatEntityState
+      ? this._hass.formatEntityState(state)
+      : attrs.friendly_name || state.state;
+  }
+
   _callout(room, cx, cy, side) {
     const flow = this._state(room.entities.airflow);
     const rate = this._state(room.entities.airflow_rate);
     const anchor = side === "left" ? "end" : side === "right" ? "start" : "middle";
     const dx = side === "left" ? -22 : side === "right" ? 22 : 0;
-    const dy = side === "top" ? -30 : side === "bottom" ? 30 : -4;
+    const dy = side === "top" ? -34 : side === "bottom" ? 34 : -4;
 
     const lines = [`<tspan x="${cx + dx}" font-weight="600">${room.name}</tspan>`];
     const glyph = this._glyph(room, cx + dx, cy + dy, side);
@@ -352,11 +484,9 @@ class HealthboxCard extends HTMLElement {
         `<tspan x="${cx + dx}" dy="14" opacity="0.7">${detail.join(" · ")}</tspan>`,
       );
 
-    const clickable = room.entities.airflow || room.entities.boost || "";
     return (
-      `<g data-entity="${clickable}">${glyph}` +
-      `<text x="${cx + dx}" y="${cy + dy}" text-anchor="${anchor}" font-size="12"` +
-      ` fill="currentColor">${lines.join("")}</text></g>`
+      `${glyph}<text x="${cx + dx}" y="${cy + dy}" text-anchor="${anchor}" font-size="12"` +
+      ` fill="currentColor">${lines.join("")}</text>`
     );
   }
 
@@ -370,8 +500,8 @@ class HealthboxCard extends HTMLElement {
     const gx =
       side === "left" ? x - w - size - 4
       : side === "right" ? x + w + 4
-      : x - size / 2;
-    const gy = side === "top" || side === "bottom" ? y - size - 14 : y - size + 2;
+      : x - w / 2 - size - 4;
+    const gy = y - size + 2;
     const scale = size / 24;
     return (
       `<g transform="translate(${gx},${gy}) scale(${scale})" opacity="0.75">` +

@@ -52,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/api/healthbox3/layout`, so the same card works on any unit and in any
   language. The artwork and the 540x540 stage geometry come from the app's
   own drawables and decoded layout, not from a redrawing.
+
+  A physical outlet split into several branches gets Renson's dotted
+  numbering (`1.1`, `1.2`, `1.3`), and the readings move into a hover
+  tooltip so a split port stays legible. An outlet is marked faulty only
+  when a reported error's association id is exactly one of this unit's
+  port numbers - `/v1/error` says nothing about what that id identifies,
+  so anything else is shown against the unit rather than blamed on a
+  room.
 - **Each room is now illustrated with Renson's own pictogram.** The
   `Room symbol` sensor carries the drawing Renson's app uses for that
   room - bathtub, chef's hat, toilet, bed - with no per-install setup. The
