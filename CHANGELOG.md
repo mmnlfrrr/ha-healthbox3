@@ -44,6 +44,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `IP address`, `MAC address` and `Connection type` sensors (diagnostic),
+  from the `/renson_core/v2/global` response that was previously read only
+  for the firmware version. `Connection type` is the one that fills a real
+  gap: `Wi-Fi status` answers "not connected" on a unit wired over
+  Ethernet, which reads like a fault until you know it is on a cable.
+
+  The unit's device entry also gains the MAC as a network connection -
+  what lets Home Assistant recognise the unit after an address change -
+  and a configuration URL pointing at the unit's own web interface. Both
+  are omitted rather than guessed when the endpoint is unreachable.
 - `Room symbol` sensor per room (diagnostic): which pictogram the device
   itself picked for the room. Lets a dashboard illustrate each room without
   the layout being written by hand per install - Home Assistant has no

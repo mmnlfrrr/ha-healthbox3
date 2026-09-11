@@ -328,21 +328,43 @@ async def test_set_room_co2_threshold_sends_expected_payload():
     }
 
 
-async def test_get_firmware_version_parses_real_shape(renson_core_global_raw):
+async def test_get_global_parses_real_shape(renson_core_global_raw):
     session = _FakeSession([_FakeResponse(200, json.dumps(renson_core_global_raw))])
     client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
 
-    version = await client.async_get_firmware_version()
+    info = await client.async_get_global()
 
-    assert version == "2.6.9"
+    assert info.firmware_version == "2.6.9"
+    assert info.interface_type == "WIFI"
+    # The fixture redacts the identifying fields rather than dropping them,
+    # so this checks they are read, not what they contain.
+    assert info.mac and info.ip and info.serial and info.warranty_number
 
 
-async def test_get_firmware_version_rejects_unexpected_shape():
+async def test_get_global_tolerates_missing_optional_fields():
+    """Only the firmware version is required; a response without the rest
+    must still parse, so a firmware that drops or renames a field takes
+    those entities unavailable instead of failing the whole fetch.
+    """
+    session = _FakeSession(
+        [_FakeResponse(200, json.dumps({"firmware version": "2.6.9"}))]
+    )
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    info = await client.async_get_global()
+
+    assert info.firmware_version == "2.6.9"
+    assert info.mac is None
+    assert info.ip is None
+    assert info.interface_type is None
+
+
+async def test_get_global_rejects_unexpected_shape():
     session = _FakeSession([_FakeResponse(200, json.dumps({"unexpected": "shape"}))])
     client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
 
     with pytest.raises(api_mod.Healthbox3InvalidResponseError):
-        await client.async_get_firmware_version()
+        await client.async_get_global()
 
 
 async def test_get_errors_parses_real_shape(errors_raw):

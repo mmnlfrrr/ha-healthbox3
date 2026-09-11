@@ -140,6 +140,15 @@
       "firmware_version": {
         "name": "Version du firmware"
       },
+      "ip_address": {
+        "name": "Adresse IP"
+      },
+      "mac_address": {
+        "name": "Adresse MAC"
+      },
+      "connection_type": {
+        "name": "Type de connexion"
+      },
       "device_errors": {
         "name": "Erreurs de l'appareil"
       },

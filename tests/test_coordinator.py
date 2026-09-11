@@ -197,8 +197,8 @@ async def test_v1_only_polling_never_fetches_firmware_version(hass, v1_data, boo
     coordinator = Healthbox3DataUpdateCoordinator(hass, entry, client, use_v2=False)
     await coordinator.async_refresh()
 
-    client.async_get_firmware_version.assert_not_called()
-    assert coordinator.data.firmware_version is None
+    client.async_get_global.assert_not_called()
+    assert coordinator.data.global_info is None
 
 
 async def test_v2_polling_fetches_firmware_version(
@@ -208,12 +208,14 @@ async def test_v2_polling_fetches_firmware_version(
     client = AsyncMock(spec=api_mod.Healthbox3ApiClient)
     client.async_get_v2_data_current.return_value = v2_data
     client.async_get_boost.return_value = boost_status
-    client.async_get_firmware_version.return_value = firmware_version
+    client.async_get_global.return_value = api_mod.GlobalInfo(
+        firmware_version=firmware_version
+    )
 
     coordinator = Healthbox3DataUpdateCoordinator(hass, entry, client, use_v2=True)
     await coordinator.async_refresh()
 
-    assert coordinator.data.firmware_version == firmware_version
+    assert coordinator.data.global_info.firmware_version == firmware_version
 
 
 async def test_firmware_version_fetch_failure_does_not_fail_whole_update(
@@ -223,7 +225,7 @@ async def test_firmware_version_fetch_failure_does_not_fail_whole_update(
     client = AsyncMock(spec=api_mod.Healthbox3ApiClient)
     client.async_get_v2_data_current.return_value = v2_data
     client.async_get_boost.return_value = boost_status
-    client.async_get_firmware_version.side_effect = api_mod.Healthbox3ConnectionError(
+    client.async_get_global.side_effect = api_mod.Healthbox3ConnectionError(
         "offline"
     )
 
@@ -231,7 +233,7 @@ async def test_firmware_version_fetch_failure_does_not_fail_whole_update(
     await coordinator.async_refresh()
 
     assert coordinator.last_update_success is True
-    assert coordinator.data.firmware_version is None
+    assert coordinator.data.global_info is None
 
 
 async def test_v1_only_polling_never_fetches_errors(hass, v1_data, boost_status):

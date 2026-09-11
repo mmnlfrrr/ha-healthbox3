@@ -140,6 +140,15 @@
       "firmware_version": {
         "name": "Firmwareversie"
       },
+      "ip_address": {
+        "name": "IP-adres"
+      },
+      "mac_address": {
+        "name": "MAC-adres"
+      },
+      "connection_type": {
+        "name": "Verbindingstype"
+      },
       "device_errors": {
         "name": "Apparaatfouten"
       },

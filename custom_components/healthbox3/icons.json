@@ -59,6 +59,15 @@
       "firmware_version": {
         "default": "mdi:chip"
       },
+      "ip_address": {
+        "default": "mdi:ip-network"
+      },
+      "mac_address": {
+        "default": "mdi:network-outline"
+      },
+      "connection_type": {
+        "default": "mdi:lan-connect"
+      },
       "device_errors": {
         "default": "mdi:alert-circle"
       },

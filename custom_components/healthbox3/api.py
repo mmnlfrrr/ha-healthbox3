@@ -534,6 +534,29 @@ class WifiStatus:
     connection_error: str | None = None
 
 
+@dataclass
+class GlobalInfo:
+    """Parsed result of `/renson_core/v2/global`.
+
+    The device's identity and network position in one response. Only
+    `firmware_version` is required: it's the one field this endpoint has
+    always been called for, and a response without it means the response
+    isn't what we think it is.
+
+    `interface_type` is the device's own answer to "how am I attached to
+    the network" ("WIFI"/"ETHERNET" on hardware seen so far) - worth
+    having next to WifiStatus, which reports "not connected" on a wired
+    unit and reads like a fault when it isn't one.
+    """
+
+    firmware_version: str
+    mac: str | None = None
+    ip: str | None = None
+    interface_type: str | None = None
+    serial: str | None = None
+    warranty_number: str | None = None
+
+
 def _optional_str(value: Any) -> str | None:
     """Return a non-empty string, or None. The device uses "" for absent."""
     return value if isinstance(value, str) and value else None
@@ -1168,20 +1191,34 @@ class Healthbox3ApiClient:
         payload = {"silent": {day: day_schedule for day in SILENT_WEEKDAYS}}
         await self._request("PUT", API_V1_DECISION, json=payload)
 
-    async def async_get_firmware_version(self) -> str:
-        """Fetch the device's current firmware version. Requires an active API key.
+    async def async_get_global(self) -> GlobalInfo:
+        """Fetch the device's identity and network position.
 
-        The real response also has MAC/IP/serial/warranty_number/datetime
-        keys - deliberately not parsed here, since MAC/serial/warranty are
-        already available (and already exposed) via DiscoveryInfo, and
-        IP/datetime aren't useful device-level information. Note the field
-        is literally `"firmware version"` (with a space) on this endpoint -
-        confirmed from a real capture - not `"Firmwareversion"` like the
-        unrelated discovery response uses for the same concept.
+        Requires an active API key. Note the firmware field is literally
+        `"firmware version"` (with a space) on this endpoint - confirmed
+        from a real capture - not `"Firmwareversion"` like the unrelated
+        discovery response uses for the same concept.
+
+        MAC/IP/serial/warranty are also in DiscoveryInfo, but that only
+        exists for a device found by UDP broadcast: a unit configured by
+        hand, or one whose discovery reply never arrived, has none of it.
+        This endpoint answers for every configured device, which is what
+        makes it the dependable source for the network entities.
+
+        Only the firmware version is required. Every other field is
+        optional, so a firmware that drops or renames one degrades to "not
+        reported" instead of taking the whole fetch down.
         """
         raw = await self._request("GET", API_RENSON_CORE_V2_GLOBAL)
         try:
-            return raw["firmware version"]
+            return GlobalInfo(
+                firmware_version=raw["firmware version"],
+                mac=_optional_str(raw.get("MAC")),
+                ip=_optional_str(raw.get("IP")),
+                interface_type=_optional_str(raw.get("IFTYPE")),
+                serial=_optional_str(raw.get("serial")),
+                warranty_number=_optional_str(raw.get("warranty_number")),
+            )
         except (KeyError, TypeError) as err:
             raise Healthbox3InvalidResponseError(
                 "Unexpected renson_core/v2/global response shape"

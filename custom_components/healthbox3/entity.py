@@ -20,7 +20,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import (
+    CONNECTION_NETWORK_MAC,
+    DeviceInfo,
+    format_mac,
+)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -64,13 +68,31 @@ class Healthbox3Entity(CoordinatorEntity[Healthbox3DataUpdateCoordinator]):
 def _unit_device(
     coordinator: Healthbox3DataUpdateCoordinator, serial: str
 ) -> DeviceInfo:
-    return DeviceInfo(
+    """Build the device entry for the unit itself.
+
+    `connections` and `configuration_url` are filled in from
+    `/renson_core/v2/global` when it answers. The MAC is what lets Home
+    Assistant recognise this unit again after it moves to another
+    address; the URL turns the device page into a way into the unit's own
+    web interface. Both are omitted rather than guessed when the endpoint
+    is unavailable - it needs an active API key, so a v1-only install
+    simply doesn't get them.
+    """
+    info = coordinator.data.global_info
+    device = DeviceInfo(
         identifiers={(DOMAIN, serial)},
         manufacturer="Renson",
         model="Healthbox 3.0",
         name=coordinator.data.healthbox.description,
         serial_number=serial,
     )
+    if info is None:
+        return device
+    if info.mac:
+        device["connections"] = {(CONNECTION_NETWORK_MAC, format_mac(info.mac))}
+    if info.ip:
+        device["configuration_url"] = f"http://{info.ip}"
+    return device
 
 
 def _room_device(serial: str, room: RoomRef) -> DeviceInfo:

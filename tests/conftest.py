@@ -243,6 +243,12 @@ def mock_api_client():
         # and report one as its state. Default them to "not reported".
         client.async_get_device = AsyncMock(return_value=None)
         client.async_get_wifi_status = AsyncMock(return_value=None)
+        # Same quirk, sharpest edge yet: an unconfigured async_get_global
+        # returns a mock whose .mac is itself a mock, which entity.py puts
+        # straight into the device registry's `connections` - and the
+        # registry is persisted as JSON, so every test that builds a device
+        # fails on teardown rather than where the mock came from.
+        client.async_get_global = AsyncMock(return_value=None)
         # Same quirk again, with a sharper edge: an unconfigured AsyncMock is
         # truthy but iterates empty, so the device-errors sensor's own
         # `if not errors` guard passes and `max()` then raises on the empty
@@ -315,8 +321,13 @@ async def setup_integration(
             return_value=room_decisions
         )
     if firmware_version is not None:
-        mock_api_client.async_get_firmware_version = AsyncMock(
-            return_value=firmware_version
+        mock_api_client.async_get_global = AsyncMock(
+            return_value=api_mod.GlobalInfo(
+                firmware_version=firmware_version,
+                mac="64:1c:10:00:00:01",
+                ip="192.0.2.1",
+                interface_type="ETHERNET",
+            )
         )
     if errors is not None:
         mock_api_client.async_get_errors = AsyncMock(return_value=errors)

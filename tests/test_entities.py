@@ -259,7 +259,7 @@ async def test_firmware_version_sensor_unavailable_when_fetch_failed(
     )
     coordinator = entry.runtime_data
 
-    coordinator.data.firmware_version = None
+    coordinator.data.global_info = None
     coordinator.async_update_listeners()
     await hass.async_block_till_done()
 

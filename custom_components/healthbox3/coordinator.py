@@ -20,6 +20,7 @@ from .api import (
     DeviceDecision,
     DeviceError,
     DeviceTelemetry,
+    GlobalInfo,
     Healthbox3ApiClient,
     Healthbox3AuthenticationError,
     Healthbox3ConnectionError,
@@ -68,7 +69,7 @@ class Healthbox3Data:
     decision: DeviceDecision | None = None
     breeze: BreezeSettings | None = None
     room_decisions: dict[int, RoomDecision] = field(default_factory=dict)
-    firmware_version: str | None = None
+    global_info: GlobalInfo | None = None
     errors: list[DeviceError] = field(default_factory=list)
     device: DeviceTelemetry | None = None
     wifi: WifiStatus | None = None
@@ -152,7 +153,7 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         decision = await self._async_get_decision_data()
         breeze = await self._async_get_breeze_data()
         room_decisions = await self._async_get_room_decisions_data()
-        firmware_version = await self._async_get_firmware_version_data()
+        global_info = await self._async_get_global_data()
         errors = await self._async_get_errors_data()
         device = await self._async_get_device_data()
         wifi = await self._async_get_wifi_data()
@@ -163,7 +164,7 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             decision=decision,
             breeze=breeze,
             room_decisions=room_decisions,
-            firmware_version=firmware_version,
+            global_info=global_info,
             errors=errors,
             device=device,
             wifi=wifi,
@@ -210,16 +211,16 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             _LOGGER.debug("Failed to fetch room decision data: %s", err)
             return {}
 
-    async def _async_get_firmware_version_data(self) -> str | None:
-        """Fetch `/renson_core/v2/global`'s firmware version - same
-        gating/tolerance as decision/breeze/room_decisions.
+    async def _async_get_global_data(self) -> GlobalInfo | None:
+        """Fetch `/renson_core/v2/global` - same gating/tolerance as
+        decision/breeze/room_decisions.
         """
         if not self.use_v2:
             return None
         try:
-            return await self.client.async_get_firmware_version()
+            return await self.client.async_get_global()
         except Healthbox3Error as err:
-            _LOGGER.debug("Failed to fetch firmware version: %s", err)
+            _LOGGER.debug("Failed to fetch global device info: %s", err)
             return None
 
     async def _async_get_errors_data(self) -> list[DeviceError]:

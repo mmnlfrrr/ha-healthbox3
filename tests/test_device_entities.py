@@ -16,7 +16,7 @@ import copy
 from unittest.mock import patch
 
 import pytest
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from custom_components.healthbox3 import api as api_mod
 from custom_components.healthbox3.const import DOMAIN, ENERGY_MAX_GAP_SECONDS
@@ -31,6 +31,20 @@ def _state(hass, platform: str, serial: str, unique_id_suffix: str):
         platform, DOMAIN, f"{serial}_{unique_id_suffix}"
     )
     return hass.states.get(entity_id) if entity_id is not None else None
+
+
+def _unit_device_entry(hass, entry, serial):
+    """Return the unit's device entry.
+
+    Walks the config entry's own devices rather than calling
+    `async_get_device(identifiers=...)`, which Home Assistant deprecated
+    once identifiers stopped being unique across config entries.
+    """
+    registry = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
+        if (DOMAIN, serial) in device.identifiers:
+            return device
+    return None
 
 
 async def test_device_sensors_report_telemetry(
@@ -164,6 +178,98 @@ async def test_room_duct_sensors_not_created_without_a_valve_parameter(
     assert _state(hass, "sensor", stripped.serial, "room1_valve_pressure") is None
     assert _state(hass, "sensor", stripped.serial, "room1_conductance") is None
     assert _state(hass, "sensor", stripped.serial, "room1_valve_port") is None
+
+
+async def test_network_sensors_report_global_info(
+    hass, mock_api_client, v2_data, boost_status, firmware_version
+):
+    """IP, MAC and connection type all come from the one /renson_core/v2/global
+    fetch the firmware version already used.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        firmware_version=firmware_version,
+    )
+
+    assert _state(hass, "sensor", v2_data.serial, "ip_address").state == "192.0.2.1"
+    assert (
+        _state(hass, "sensor", v2_data.serial, "mac_address").state
+        == "64:1c:10:00:00:01"
+    )
+    assert (
+        _state(hass, "sensor", v2_data.serial, "connection_type").state == "ETHERNET"
+    )
+
+
+async def test_network_sensors_unavailable_when_global_fetch_failed(
+    hass, mock_api_client, v2_data, boost_status, firmware_version
+):
+    """The endpoint needs an API key and can fail on its own; when it does
+    these go unavailable rather than reporting a stale address.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        firmware_version=firmware_version,
+    )
+    coordinator = entry.runtime_data
+
+    coordinator.data.global_info = None
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+
+    for suffix in ("ip_address", "mac_address", "connection_type"):
+        assert _state(hass, "sensor", v2_data.serial, suffix).state == "unavailable"
+
+
+async def test_unit_device_carries_mac_connection_and_configuration_url(
+    hass, mock_api_client, v2_data, boost_status, firmware_version
+):
+    """The MAC is what lets Home Assistant recognise the unit across an
+    address change, and the URL turns the device page into a way into the
+    unit's own web interface.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        firmware_version=firmware_version,
+    )
+
+    device = _unit_device_entry(hass, entry, v2_data.serial)
+    assert device is not None
+    assert (dr.CONNECTION_NETWORK_MAC, "64:1c:10:00:00:01") in device.connections
+    assert device.configuration_url == "http://192.0.2.1"
+
+
+async def test_unit_device_omits_network_details_without_global_info(
+    hass, mock_api_client, v1_data, boost_status
+):
+    """A v1-only install can't reach the endpoint at all, so the device
+    entry goes without rather than carrying a guess.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+        boost_status=boost_status,
+    )
+
+    device = _unit_device_entry(hass, entry, v1_data.serial)
+    assert device is not None
+    assert device.connections == set()
+    assert device.configuration_url is None
 
 
 async def test_room_symbol_prefers_the_device_icon_over_the_room_type(
