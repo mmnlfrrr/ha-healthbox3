@@ -13,11 +13,12 @@ controls.
 from __future__ import annotations
 
 import copy
+from unittest.mock import patch
 
 import pytest
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.healthbox3.const import DOMAIN
+from custom_components.healthbox3.const import DOMAIN, ENERGY_MAX_GAP_SECONDS
 
 from .conftest import setup_integration
 
@@ -254,3 +255,152 @@ async def test_advanced_api_binary_sensor_on_with_a_valid_key(
     )
 
     assert _state(hass, "binary_sensor", v2_data.serial, "advanced_api").state == "on"
+
+
+async def _refresh_with_power(hass, entry, watts: float | None) -> None:
+    """Push one coordinator update carrying this whole-device power reading."""
+    coordinator = entry.runtime_data
+    if coordinator.data.device is not None:
+        coordinator.data.device.power = watts
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+
+
+async def test_energy_sensor_integrates_power_over_time(
+    hass, mock_api_client, v2_data, boost_status, device_telemetry, device_decision
+):
+    """Constant 3600 W for 15 minutes must read as 0.9 kWh.
+
+    15 minutes because that is the gap cap: a longer interval is treated as
+    an outage and deliberately skipped, which the test below covers.
+    Elapsed time comes from a monotonic clock inside the entity, so the test
+    patches that rather than trying to make real time pass.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        device=device_telemetry,
+        decision=device_decision,
+    )
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    clock = [1000.0]
+    with patch(
+        "custom_components.healthbox3.sensor.monotonic", side_effect=lambda: clock[0]
+    ):
+        await _refresh_with_power(hass, entry, 3600.0)  # anchor, adds nothing
+        clock[0] += ENERGY_MAX_GAP_SECONDS
+        await _refresh_with_power(hass, entry, 3600.0)
+
+    state = _state(hass, "sensor", v2_data.serial, "energy")
+    assert float(state.state) == pytest.approx(0.9)
+
+
+async def test_energy_sensor_uses_the_average_of_both_readings(
+    hass, mock_api_client, v2_data, boost_status, device_telemetry, device_decision
+):
+    """Trapezoidal, not left-hand: 0 W then 7200 W averages 3600 W, so the
+    same 15 minutes yields the same 0.9 kWh as a steady 3600 W above. A
+    left-hand sum would have scored this interval at 0.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        device=device_telemetry,
+        decision=device_decision,
+    )
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    clock = [1000.0]
+    with patch(
+        "custom_components.healthbox3.sensor.monotonic", side_effect=lambda: clock[0]
+    ):
+        await _refresh_with_power(hass, entry, 0.0)
+        clock[0] += ENERGY_MAX_GAP_SECONDS
+        await _refresh_with_power(hass, entry, 7200.0)
+
+    state = _state(hass, "sensor", v2_data.serial, "energy")
+    assert float(state.state) == pytest.approx(0.9)
+
+
+async def test_energy_sensor_skips_gaps_longer_than_the_cap(
+    hass, mock_api_client, v2_data, boost_status, device_telemetry, device_decision
+):
+    """A long gap means the unit was unreachable - don't invent the energy."""
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        device=device_telemetry,
+        decision=device_decision,
+    )
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    clock = [1000.0]
+    with patch(
+        "custom_components.healthbox3.sensor.monotonic", side_effect=lambda: clock[0]
+    ):
+        await _refresh_with_power(hass, entry, 3600.0)
+        clock[0] += ENERGY_MAX_GAP_SECONDS + 1
+        await _refresh_with_power(hass, entry, 3600.0)
+
+    state = _state(hass, "sensor", v2_data.serial, "energy")
+    assert float(state.state) == pytest.approx(0.0)
+
+
+async def test_energy_sensor_never_pairs_across_an_outage(
+    hass, mock_api_client, v2_data, boost_status, device_telemetry, device_decision
+):
+    """A reading that goes missing drops the anchor, so the next one can't be
+    paired with a stale value from before the outage.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        device=device_telemetry,
+        decision=device_decision,
+    )
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    clock = [1000.0]
+    with patch(
+        "custom_components.healthbox3.sensor.monotonic", side_effect=lambda: clock[0]
+    ):
+        await _refresh_with_power(hass, entry, 3600.0)
+        clock[0] += 60.0
+        await _refresh_with_power(hass, entry, None)  # unreadable
+        clock[0] += 60.0
+        await _refresh_with_power(hass, entry, 3600.0)  # re-anchors only
+
+    state = _state(hass, "sensor", v2_data.serial, "energy")
+    assert float(state.state) == pytest.approx(0.0)
+
+
+async def test_energy_sensor_is_an_energy_dashboard_total(
+    hass, mock_api_client, v2_data, boost_status, device_telemetry
+):
+    """The Energy dashboard only accepts kWh with state_class total_increasing."""
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        device=device_telemetry,
+    )
+
+    state = _state(hass, "sensor", v2_data.serial, "energy")
+    assert state.attributes["device_class"] == "energy"
+    assert state.attributes["state_class"] == "total_increasing"
+    assert state.attributes["unit_of_measurement"] == "kWh"

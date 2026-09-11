@@ -243,6 +243,11 @@ def mock_api_client():
         # and report one as its state. Default them to "not reported".
         client.async_get_device = AsyncMock(return_value=None)
         client.async_get_wifi_status = AsyncMock(return_value=None)
+        # Same quirk again, with a sharper edge: an unconfigured AsyncMock is
+        # truthy but iterates empty, so the device-errors sensor's own
+        # `if not errors` guard passes and `max()` then raises on the empty
+        # iterable. Default to a real empty list.
+        client.async_get_errors = AsyncMock(return_value=[])
         yield client
 
 

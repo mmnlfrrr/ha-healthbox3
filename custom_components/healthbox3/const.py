@@ -132,6 +132,14 @@ COLLECTOR_PRIMARY_KEY = "0"
 # device_class-less sensor rather than anything HA will try to convert.
 CONDUCTANCE_UNIT = "m³/(h·√Pa)"
 
+# Longest gap between two power readings that still gets integrated into the
+# energy total. The coordinator polls every DEFAULT_SCAN_INTERVAL, so a normal
+# gap is seconds and a restart is well under this; anything longer means the
+# unit was unreachable, and there is no way to tell "Home Assistant was down
+# while the fan kept running" from "the unit was off". Skipping under-reports
+# rather than inventing energy that may never have been used.
+ENERGY_MAX_GAP_SECONDS = 15 * 60
+
 API_KEY_STATE_VALID = "valid"
 API_KEY_STATE_EMPTY = "empty"
 

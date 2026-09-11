@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from time import monotonic
 from typing import override
 
 from homeassistant.components.sensor import (
+    RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
@@ -16,6 +18,7 @@ from homeassistant.const import (
     PERCENTAGE,
     REVOLUTIONS_PER_MINUTE,
     UnitOfElectricPotential,
+    UnitOfEnergy,
     UnitOfPower,
     UnitOfPressure,
     UnitOfRatio,
@@ -35,6 +38,7 @@ from .api import (
 )
 from .const import (
     CONDUCTANCE_UNIT,
+    ENERGY_MAX_GAP_SECONDS,
     SENSOR_TYPE_AQI,
     SENSOR_TYPE_CO2,
     SENSOR_TYPE_GLOBAL_AQI,
@@ -331,6 +335,7 @@ async def async_setup_entry(
         entities.append(Healthbox3GlobalVentilationLevelSensor(coordinator, serial))
         entities.append(Healthbox3FirmwareVersionSensor(coordinator, serial))
         entities.append(Healthbox3DeviceErrorsSensor(coordinator, serial))
+        entities.append(Healthbox3EnergySensor(coordinator, serial))
         entities.extend(
             Healthbox3DeviceSensor(coordinator, serial, meta)
             for meta in DEVICE_SENSOR_META
@@ -998,3 +1003,80 @@ class Healthbox3WifiStatusSensor(Healthbox3Entity, SensorEntity):
         if wifi is None:
             return None
         return {"ssid": wifi.ssid, "connection_error": wifi.connection_error}
+
+
+class Healthbox3EnergySensor(Healthbox3Entity, RestoreSensor):
+    """Cumulative electrical energy, integrated from the whole-device power.
+
+    The Healthbox reports instantaneous power, never a cumulative figure,
+    so this integrates it here rather than leaving every user to wire up a
+    Riemann-sum helper by hand - a unit that runs continuously is exactly
+    what Home Assistant's Energy dashboard is for, and that dashboard needs
+    kWh, not W.
+
+    Trapezoidal between consecutive readings, which is what a
+    left-Riemann helper would under-report on a varying load. The running
+    total survives restarts via RestoreSensor; elapsed time comes from a
+    monotonic clock so that a system clock correction can't inflate or
+    rewind it.
+
+    `TOTAL_INCREASING` rather than `TOTAL`: the value only ever grows, and
+    the one case where it drops - a restore that found nothing and started
+    back at zero - is precisely what that state class is defined to handle.
+    """
+
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_suggested_display_precision = 3
+    _attr_translation_key = "energy"
+
+    def __init__(
+        self, coordinator: Healthbox3DataUpdateCoordinator, serial: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, serial)
+        self._attr_unique_id = f"{serial}_energy"
+        self._total_kwh = 0.0
+        # (monotonic timestamp, watts) of the previous usable reading.
+        self._previous: tuple[float, float] | None = None
+
+    @override
+    async def async_added_to_hass(self) -> None:
+        """Restore the running total before the first coordinator update."""
+        await super().async_added_to_hass()
+        last = await self.async_get_last_sensor_data()
+        if last is None or last.native_value is None:
+            return
+        try:
+            self._total_kwh = float(last.native_value)
+        except (TypeError, ValueError):
+            # A restored state that isn't a number means starting over is the
+            # only safe option; TOTAL_INCREASING covers the resulting drop.
+            self._total_kwh = 0.0
+
+    @override
+    def _handle_coordinator_update(self) -> None:
+        """Add the energy used since the previous reading, then write state."""
+        device = self.coordinator.data.device
+        watts = device.power if device is not None else None
+        if watts is not None:
+            now = monotonic()
+            previous = self._previous
+            if previous is not None:
+                elapsed = now - previous[0]
+                if 0 < elapsed <= ENERGY_MAX_GAP_SECONDS:
+                    average_watts = (previous[1] + watts) / 2
+                    self._total_kwh += average_watts * elapsed / 3_600_000
+            self._previous = (now, watts)
+        else:
+            # Drop the anchor: the next reading must not be paired with one
+            # from before an outage of unknown length.
+            self._previous = None
+        super()._handle_coordinator_update()
+
+    @property
+    @override
+    def native_value(self) -> float:
+        """Return the energy accumulated so far."""
+        return self._total_kwh

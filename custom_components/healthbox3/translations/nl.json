@@ -186,6 +186,9 @@
       },
       "wifi_status": {
         "name": "Wifi-status"
+      },
+      "energy": {
+        "name": "Energie"
       }
     },
     "select": {

@@ -211,7 +211,8 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `Ventilation level` | Whole-house current ventilation level, as a percentage; not capped at 100% - requires an active API key |
 | `sensor` | `Firmware version` | The device's currently installed firmware version - diagnostic entity, requires an active API key |
 | `sensor` | `Device errors` | Count of currently-active device-reported errors, plus the most recent one's details as attributes - diagnostic entity, requires an active API key; each active error also creates a repair issue (**Settings > Repairs**) |
-| `sensor` | `Power` | Whole-device electrical power draw - requires an active API key; see [Energy dashboard](#energy-dashboard) |
+| `sensor` | `Power` | Whole-device electrical power draw - requires an active API key |
+| `sensor` | `Energy` | Cumulative kWh, integrated from `Power` - feeds the Energy dashboard directly, requires an active API key; see [Energy dashboard](#energy-dashboard) |
 | `sensor` | `Fan power` | The fan's own power draw, lower than `Power` - requires an active API key |
 | `sensor` | `Fan airflow` | Total airflow through the fan, m³/h - requires an active API key |
 | `sensor` | `Fan speed` | Fan speed in rpm - requires an active API key |
@@ -265,24 +266,24 @@ itself.
 
 ### Energy dashboard
 
-The `Power` sensor makes the unit's consumption available to Home
-Assistant's **Energy dashboard**, which is worth doing: a Healthbox runs
-continuously, so even a handful of watts adds up over a year.
+The `Energy` sensor is cumulative kWh, ready to drop straight into Home
+Assistant's **Energy dashboard** - no Riemann-sum helper to set up. That is
+worth doing: the unit runs continuously, so even a handful of watts adds up
+over a year.
 
-The dashboard needs energy (kWh), not power (W), so add a Riemann-sum
-helper once:
+**Settings > Dashboards > Energy > Individual devices > Add device**, and
+pick the Healthbox `Energy` sensor.
 
-1. **Settings > Devices & services > Helpers > Create helper > Integral
-   sensor**
-2. Input sensor: the Healthbox `Power` sensor
-3. Integration method: **Left Riemann sum** (or Trapezoidal), metric
-   prefix **k**, time unit **h**
-4. **Settings > Dashboards > Energy > Individual devices > Add device**,
-   and pick the helper you just created
+It is integrated here from the whole-device `Power` reading, trapezoidally
+between consecutive polls, and the running total survives restarts. Gaps
+longer than 15 minutes are skipped rather than extrapolated: past that
+point there is no way to tell "Home Assistant was down while the fan kept
+running" from "the unit was off", and under-reporting beats inventing
+energy that may never have been used.
 
-Use `Power` rather than `Fan power`: the fan-only figure leaves out the
-electronics' own draw and will under-report. On the reference hardware the
-two read 6.2 W and 11.2 W respectively at the same moment.
+`Power` (whole device) is what feeds it, not `Fan power`: the fan-only
+figure leaves out the electronics' own draw and would under-report. On the
+reference hardware the two read 6.2 W and 11.2 W at the same moment.
 
 ### Duct model
 

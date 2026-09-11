@@ -86,6 +86,9 @@
       },
       "wifi_status": {
         "default": "mdi:wifi"
+      },
+      "energy": {
+        "default": "mdi:meter-electric"
       }
     },
     "select": {

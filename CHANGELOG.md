@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Energy` sensor: cumulative kWh, usable in the Energy dashboard as-is,
+  with no Riemann-sum helper to wire up by hand. Integrated from the
+  whole-device `Power` reading, trapezoidally between polls, with the
+  running total restored across restarts. Gaps longer than 15 minutes are
+  skipped rather than extrapolated - past that there is no telling a Home
+  Assistant outage from the unit being off, and under-reporting beats
+  inventing energy.
 - Electrical power sensors (`Power` for the whole device, `Fan power` for
   the fan alone). Both are real, distinct device readings - the fan-only
   figure is the lower of the two, so the whole-device one is what belongs

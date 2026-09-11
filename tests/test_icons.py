@@ -35,6 +35,7 @@ EXTRA_SENSOR_KEYS = {
     "firmware_version",
     "device_errors",
     "wifi_status",
+    "energy",
 }
 BINARY_SENSOR_KEYS = {
     "device_problem",
