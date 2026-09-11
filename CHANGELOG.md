@@ -68,7 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Renson app does: a numbered connection at each wired collector port and
   a cap everywhere else, with the unit centred. Hovering an outlet shows
   its room - pictogram, name, the Home Assistant area it sits in, its
-  regulatory code, airflow, air quality, profile and boost - and clicking
+  regulatory code, airflow, air quality, profile and boost - with that
+  room's airflow percentage on the panel's own title line, beside the
+  outlet number, since it is the figure the panel is opened for. Clicking
   it opens that room's more-info, and the card's header carries the
   whole-house ventilation level beside the unit's name. The hover panel is placed with
   CSS anchor positioning where the browser has it, so it flips itself to

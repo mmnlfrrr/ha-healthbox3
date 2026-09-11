@@ -604,6 +604,12 @@ class HealthboxCard extends HTMLElement {
     // Three tiers: what the room is, where it sits, what it is doing.
     // The middle one is the quiet one - the Home Assistant area and the
     // regulatory code are context you look up, not figures you watch.
+    //
+    // The airflow percentage sits on the title line rather than among the
+    // readings: it is the one figure you open the panel for, and putting
+    // it beside the outlet number answers "what is outlet 3 doing" in a
+    // single line. Dropped, not rendered as NaN, when there is no reading
+    // - a room without both of its underlying values has no such sensor.
     const where = [];
     if (room.area) where.push(room.area);
     const code = this._state(room.entities.legislation_code);
@@ -616,7 +622,10 @@ class HealthboxCard extends HTMLElement {
     const profile = this._state(room.entities.profile);
     const boost = this._state(room.entities.boost);
 
-    if (flow) detail.push(`${Math.round(Number(flow.state))}%%`);
+    const percent = flow && Number.isFinite(Number(flow.state))
+      ? ` · ${Math.round(Number(flow.state))}%%`
+      : "";
+
     if (rate) detail.push(`${Math.round(Number(rate.state))} m³/h`);
     if (aqi) detail.push(this._label(aqi));
     if (profile) detail.push(this._label(profile));
@@ -625,7 +634,7 @@ class HealthboxCard extends HTMLElement {
     return (
       `<ha-icon icon="${room.icon}" style="--mdc-icon-size:22px;` +
       `color:${room.error ? "var(--error-color,#db4437)" : "inherit"}"></ha-icon>` +
-      `<span style="line-height:1.35"><b>${label} · ${room.name}</b>` +
+      `<span style="line-height:1.35"><b>${label} · ${room.name}${percent}</b>` +
       (where.length
         ? `<br><span style="font-size:11px;opacity:.55">` +
           `${where.join(" · ")}</span>`
