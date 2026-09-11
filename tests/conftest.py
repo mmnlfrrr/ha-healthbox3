@@ -263,13 +263,22 @@ def make_config_entry(
     serial: str,
     api_key: str | None = "goodkey",
     options: dict | None = None,
+    title: str | None = None,
 ) -> MockConfigEntry:
-    """Create and register a Healthbox3 config entry."""
+    """Create and register a Healthbox3 config entry.
+
+    `title` is given here rather than set afterwards on purpose: the entry
+    has an update listener that reloads it on any change, title included,
+    so renaming a live entry mid-test tears the integration down and sets
+    it up again against whatever the shared client mock has been left
+    configured to return.
+    """
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_HOST: "192.0.2.1", CONF_API_KEY: api_key},
         options=options or {},
         unique_id=serial,
+        **({"title": title} if title is not None else {}),
     )
     entry.add_to_hass(hass)
     return entry
@@ -291,6 +300,7 @@ async def setup_integration(
     errors: list[api_mod.DeviceError] | None = None,
     device: api_mod.DeviceTelemetry | None = None,
     wifi: api_mod.WifiStatus | None = None,
+    title: str | None = None,
 ) -> MockConfigEntry:
     """Create a config entry and run async_setup_entry against a mocked client.
 
@@ -302,7 +312,7 @@ async def setup_integration(
     key on file). Defaults to matching `api_key` when not given, to cover
     the common case of "the entry's own key is/isn't valid".
     """
-    entry = make_config_entry(hass, serial=serial, api_key=api_key)
+    entry = make_config_entry(hass, serial=serial, api_key=api_key, title=title)
 
     effective_valid = bool(api_key) if api_key_valid is None else api_key_valid
     mock_api_client.async_get_api_key_status.return_value = api_mod.ApiKeyStatus(

@@ -285,5 +285,15 @@
       "title": "La Healthbox a signalé une erreur {severity}",
       "description": "La Healthbox a signalé une erreur de catégorie {category} (code {code}) : {description}\n\nSignalée à {time}. Cela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
     }
+  },
+  "system_health": {
+    "info": {
+      "can_reach_device": "Accès à l'appareil",
+      "firmware_version": "Version du micrologiciel",
+      "api_key_active": "Clé API active (données de capteurs complètes)",
+      "poll_interval_seconds": "Intervalle d'interrogation (secondes)",
+      "last_poll_successful": "Dernière interrogation réussie",
+      "rooms": "Pièces"
+    }
   }
 }

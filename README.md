@@ -562,6 +562,16 @@ tenth minute rather than every cycle.
 
 ## Troubleshooting
 
+**Start here: Settings → System → Repairs → ⋮ → System information.** This
+integration adds a row there with what it can see of the device right now -
+whether it answers at all, its firmware version, whether privileged (v2)
+access is active, how often it is being polled, whether the last poll
+worked, and how many rooms came back. That page carries nothing
+identifying, so it is safe to screenshot into a forum thread; for the full
+picture - every endpoint's parsed response - use **Download diagnostics**
+on the device page instead, which redacts the identifying fields but is a
+file you attach deliberately rather than a screen you show.
+
 **Setup fails with "Failed to connect to the device."** Confirm the IP is
 reachable from Home Assistant (not just from your phone/laptop - a VLAN or
 firewall rule can block one but not the other), and that nothing else
@@ -681,6 +691,12 @@ register.
 concurrently instead of walking them one at a time, caps how many reach
 the device at once, and stops re-reading values that do not change
 between polls. The interval is a per-entry option rather than a constant.
+
+**There is a system health page**, so "is it answering, on what firmware,
+with what access, how often, did the last poll work" is one screen in
+Settings rather than a diagnostics download - and one that carries nothing
+identifying, so it can be screenshotted into a thread as-is. See
+[Troubleshooting](#troubleshooting).
 
 **Six bugs are fixed**, four of them silent: a correct API key reported
 as rejected while the device was still validating it; the room

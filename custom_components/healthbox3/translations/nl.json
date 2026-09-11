@@ -285,5 +285,15 @@
       "title": "Healthbox meldde een {severity}-fout",
       "description": "De Healthbox meldde een fout in categorie {category} (code {code}): {description}\n\nGemeld om {time}. Dit kan niet vanuit Home Assistant worden gewist - gebruik de Renson-app of het apparaat zelf om dit te bevestigen of op te lossen. Raadpleeg de Renson-app of neem contact op met uw installateur voor gedetailleerde probleemoplossingsstappen. Dit issue verdwijnt automatisch zodra het apparaat dit niet langer meldt."
     }
+  },
+  "system_health": {
+    "info": {
+      "can_reach_device": "Apparaat bereikbaar",
+      "firmware_version": "Firmwareversie",
+      "api_key_active": "API-sleutel actief (volledige sensorgegevens)",
+      "poll_interval_seconds": "Pollinginterval (seconden)",
+      "last_poll_successful": "Laatste polling geslaagd",
+      "rooms": "Ruimtes"
+    }
   }
 }

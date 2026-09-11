@@ -88,6 +88,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A system health page** (**Settings** → **System** → **Repairs** → ⋮ →
+  **System information**), answering the first round of every support
+  exchange without anyone having to produce a diagnostics file: whether
+  the device answers at all, its firmware version, whether privileged (v2)
+  access is active, how often it is being polled, whether the last poll
+  worked, and how many rooms came back.
+
+  It carries nothing identifying - no IP, no serial, no MAC, not even
+  indirectly through the config entry's title, which is
+  `Healthbox 3 (<serial>)`. Diagnostics is a file the user deliberately
+  attaches; this page sits in Settings and gets screenshotted into forum
+  threads, so with more than one Healthbox its rows are numbered rather
+  than named.
 - **The poll interval is configurable** (**Settings** → **Devices &
   Services** → **Renson Healthbox 3** → **Configure**), between 15 seconds
   and 10 minutes. The entry reloads itself when you change it. See
