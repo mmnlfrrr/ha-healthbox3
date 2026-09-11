@@ -1,0 +1,567 @@
+{
+  "breeze": {
+    "average_temp": 30.0,
+    "enable": true,
+    "min_hold_time": 3600,
+    "ramp_time": 300
+  },
+  "cdd_parameters": {
+    "answers": {
+      "4c90ec91-7bcd-4f38-bcd3-abd054fc88c0": "REDACTED",
+      "6af4d965-7788-4ea3-926d-3a5f3696109b": "REDACTED",
+      "6bc22d2c-7ee4-465d-b42e-7a933413d1da": "REDACTED",
+      "dea75f6a-5010-4065-abfa-9cf15fb8f75c": "REDACTED"
+    }
+  },
+  "cdd_version": "2026-08-03T09:50:21.7427834Z",
+  "cooking_hood": {
+    "level": 0.0
+  },
+  "fire_protect": {
+    "close": true,
+    "enable": true,
+    "rel_hum_threshold": 60.0,
+    "temp_threshold": 70.0
+  },
+  "global_ventilation_level": 32.82051282051282,
+  "minimum": 30.0,
+  "profile": [
+    {
+      "level": 70.0,
+      "name": "eco"
+    },
+    {
+      "level": 100.0,
+      "name": "health"
+    },
+    {
+      "level": 120.0,
+      "name": "intense"
+    }
+  ],
+  "program": {
+    "enable": false,
+    "friday": [],
+    "monday": [],
+    "saturday": [],
+    "sunday": [],
+    "thursday": [],
+    "tuesday": [],
+    "wednesday": []
+  },
+  "room": {
+    "1": {
+      "boost": {
+        "default_level": 100.0,
+        "default_timeout": 900,
+        "enable": false,
+        "level": 100.0,
+        "remaining": 0,
+        "timeout": 900
+      },
+      "demand": {
+        "CO2": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "DVOC": {
+          "dynamic": {
+            "average": 300,
+            "decay": 900,
+            "enable": true,
+            "maximum": 0.4,
+            "minimum": 0.0,
+            "restore": 20.0,
+            "timeout": 1800
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "VOC": {
+          "dynamic": {
+            "average": 300,
+            "decay": 900,
+            "enable": true,
+            "maximum": 4.0,
+            "minimum": 0.0,
+            "restore": 20.0,
+            "timeout": 1800
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "absolute_humidity": {
+          "dynamic": {
+            "average": 300,
+            "decay": 1800,
+            "enable": true,
+            "maximum": 0.00333,
+            "minimum": 4.0,
+            "restore": 20.0,
+            "timeout": 7200
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "relative_humidity": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 7200,
+            "average": 60,
+            "coefficients": [
+              0.0,
+              1.0
+            ],
+            "decay": 3600,
+            "enable": true,
+            "enable_alternating": true,
+            "maximum": 80.0,
+            "minimum": 75.0
+          }
+        }
+      },
+      "minimum": 5.0,
+      "nominal": 45.0,
+      "offset": 0.0,
+      "profile": 1
+    },
+    "2": {
+      "boost": {
+        "default_level": 80.0,
+        "default_timeout": 901,
+        "enable": false,
+        "level": 80.0,
+        "remaining": 0,
+        "timeout": 901
+      },
+      "demand": {
+        "CO2": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "DVOC": {
+          "dynamic": {
+            "average": 300,
+            "decay": 900,
+            "enable": true,
+            "maximum": 0.4,
+            "minimum": 0.0,
+            "restore": 20.0,
+            "timeout": 1800
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "VOC": {
+          "dynamic": {
+            "average": 300,
+            "decay": 900,
+            "enable": true,
+            "maximum": 4.0,
+            "minimum": 0.0,
+            "restore": 20.0,
+            "timeout": 1800
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "absolute_humidity": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "relative_humidity": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        }
+      },
+      "minimum": 10.0,
+      "nominal": 26.0,
+      "offset": 0.0,
+      "profile": 1
+    },
+    "3": {
+      "boost": {
+        "default_level": 270.0,
+        "default_timeout": 1800,
+        "enable": false,
+        "level": 270.0,
+        "remaining": 0,
+        "timeout": 1800
+      },
+      "demand": {
+        "CO2": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 60,
+            "coefficients": [
+              0.0,
+              1.0
+            ],
+            "decay": 300,
+            "enable": true,
+            "enable_alternating": false,
+            "maximum": 950.0,
+            "minimum": 800.0
+          }
+        },
+        "DVOC": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "VOC": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "absolute_humidity": {
+          "dynamic": {
+            "average": 300,
+            "decay": 1800,
+            "enable": true,
+            "maximum": 0.00333,
+            "minimum": 4.0,
+            "restore": 20.0,
+            "timeout": 7200
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 30,
+            "average": 30,
+            "coefficients": [
+              0.0,
+              0.0
+            ],
+            "decay": 1,
+            "enable": false,
+            "enable_alternating": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9
+          }
+        },
+        "relative_humidity": {
+          "dynamic": {
+            "average": 30,
+            "decay": 1,
+            "enable": false,
+            "maximum": 99999.9,
+            "minimum": 99999.9,
+            "restore": 20.0,
+            "timeout": 1
+          },
+          "maximum_output": null,
+          "maximum_output_percentage": null,
+          "static": {
+            "alternating": 7200,
+            "average": 60,
+            "coefficients": [
+              0.0,
+              1.0
+            ],
+            "decay": 3600,
+            "enable": true,
+            "enable_alternating": true,
+            "maximum": 80.0,
+            "minimum": 75.0
+          }
+        }
+      },
+      "minimum": 5.0,
+      "nominal": 50.0,
+      "offset": 0.0,
+      "profile": 1
+    }
+  },
+  "silent": {
+    "enable": false,
+    "friday": [
+      {
+        "silent": false,
+        "time": "08:00:00"
+      },
+      {
+        "silent": true,
+        "time": "22:00:00"
+      }
+    ],
+    "monday": [
+      {
+        "silent": false,
+        "time": "08:00:00"
+      },
+      {
+        "silent": true,
+        "time": "22:00:00"
+      }
+    ],
+    "reduction": 5.0,
+    "saturday": [
+      {
+        "silent": false,
+        "time": "08:00:00"
+      },
+      {
+        "silent": true,
+        "time": "22:00:00"
+      }
+    ],
+    "sunday": [
+      {
+        "silent": false,
+        "time": "08:00:00"
+      },
+      {
+        "silent": true,
+        "time": "10:00:00"
+      }
+    ],
+    "thursday": [
+      {
+        "silent": false,
+        "time": "08:00:00"
+      },
+      {
+        "silent": true,
+        "time": "22:00:00"
+      }
+    ],
+    "tuesday": [
+      {
+        "silent": false,
+        "time": "08:00:00"
+      },
+      {
+        "silent": true,
+        "time": "22:00:00"
+      }
+    ],
+    "wednesday": [
+      {
+        "silent": false,
+        "time": "08:00:00"
+      },
+      {
+        "silent": true,
+        "time": "22:00:00"
+      }
+    ]
+  },
+  "time_dependent_controls_disabled": false
+}

@@ -261,8 +261,8 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `number` | `Breeze temperature` | Breeze's trigger average outdoor temperature, 15-35°C - requires an active API key |
 | `number` | `<room> CO2 threshold` | CO2 concentration (ppm) that triggers this room's demand control - only created for rooms that support it, requires an active API key |
 | `number` | `Silent reduction` | Ventilation reduction while the silent schedule is active, 5-25% - requires an active API key |
-| `time` | `Silent start time` | Time of day the silent schedule starts, applied to every day of the week - requires an active API key, see [Known limitations](#known-limitations) |
-| `time` | `Silent stop time` | Time of day the silent schedule stops, applied to every day of the week - requires an active API key, see [Known limitations](#known-limitations) |
+| `time` | `Silent start time` | Time of day the silent schedule starts - shows Monday, with the whole week in its `schedule` attribute; writing applies one time to every day. Requires an active API key, see [Known limitations](#known-limitations) |
+| `time` | `Silent stop time` | Time of day the silent schedule stops - shows Monday, with the whole week in its `schedule` attribute; writing applies one time to every day. Requires an active API key, see [Known limitations](#known-limitations) |
 
 ### Devices and areas
 
@@ -523,17 +523,23 @@ tenth minute rather than every cycle.
   for the device (or this integration) to detect the expiry date in
   advance. See [Getting an API key](#getting-an-api-key-optional-but-recommended)
   above.
-- **The silent schedule's start/stop times apply to every day of the week
-  identically - there is no per-day schedule.** The device's API does
-  support a genuinely different start/stop pair for each weekday (this is
-  what Renson's own app lets you configure), but this integration only
-  ever reads and writes a single shared pair, matching how the app
-  presents the common case. If you already have different per-day times
-  set via the app, changing the `Silent start time` or `Silent stop time`
-  entity **once** in Home Assistant overwrites all seven days to match
-  that one shared pair - your existing per-day customization is not
-  preserved. If you rely on different silent hours per day, don't use
-  these two time entities.
+- **Writing a silent schedule time applies it to every day of the week.**
+  The device holds a genuinely different start/stop pair per weekday (this
+  is what Renson's own app lets you configure), and the API has no way to
+  write just one of them - a schedule write sends all seven.
+
+  Reading is per-day: both time entities show **Monday** as the reference
+  day and carry the full week in their `schedule` attribute, with
+  `uniform: false` when the days do not all agree. A real device was found
+  with Sunday's silent period starting at 10:00 and every other day's at
+  22:00; before this, Home Assistant showed 22:00 flat and the one day
+  that differed was the one day it could not show.
+
+  So if you have per-day times set via the app, changing `Silent start
+  time` or `Silent stop time` **once** in Home Assistant overwrites all
+  seven days to match that single pair. That is now logged as a warning
+  naming the days it flattens, but it is not preventable - if you rely on
+  different silent hours per day, don't use these two entities.
 - **Device-reported errors can't be cleared from Home Assistant.** The
   device only exposes a bulk "clear everything" action, with no way to
   acknowledge a single error - wiring that up to a repair issue's "Fix"

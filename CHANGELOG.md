@@ -88,6 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `docs/fixtures/v2-decision.json` capture from real hardware: the whole
+  decision tree in one response - profiles, per-room boost and demand,
+  Breeze, Silent, Program, fire protection. The hand-built
+  `v1-decision.json` it joins has all seven weekdays identical, which is
+  exactly why the Monday-only assumption fixed below survived 374 tests.
 - **A system health page** (**Settings** → **System** → **Repairs** → ⋮ →
   **System information**), answering the first round of every support
   exchange without anyone having to produce a diagnostics file: whether
@@ -251,6 +256,27 @@ called. Like every other reverse-engineered endpoint here, both are gated
 on an active API key.
 
 ### Fixed
+
+- **The silent schedule is read for all seven weekdays, not just Monday.**
+  The device holds one window per weekday; this integration read `monday`
+  and assumed the other six matched. A real unit was then found with
+  Sunday's silent period starting at **10:00** and every other day's at
+  22:00 - so Home Assistant showed 22:00 flat, and the one day that
+  differed was the one day it could not show.
+
+  Both time entities still display Monday, as the reference day the
+  device's single-window write applies to, but now carry the full week in
+  a `schedule` attribute alongside `uniform`, which is `false` when the
+  days disagree. Writing one still applies it to all seven - the API has
+  no per-day write - and now logs a warning naming the days it flattens
+  instead of destroying them silently.
+
+  A day the device sends malformed is skipped rather than raised on: that
+  same response carries demand control, minimum ventilation and Breeze,
+  so failing on it would cost far more than the schedule it came from.
+  The two entries of a day are also read by their own `silent` flag
+  rather than by position, so a firmware sending them the other way round
+  cannot invert start and stop while both entities still look plausible.
 
 - **Diagnostics published the device's MAC address and IP in clear.**
   `async_redact_data` matches keys exactly, and this device's address
