@@ -54,6 +54,25 @@ window.customIconsets[%s] = async (name) => {
 """
 
 
+def icon_name(icon: str) -> str:
+    """Return how the frontend addresses one of this set's icons.
+
+    `<set>:<icon>` - the same shape as `mdi:leaf`, because it is the same
+    mechanism: the frontend splits an icon name on its first colon, looks
+    the left half up in `window.customIconsets`, and calls it with the
+    right half. `renson:bath` therefore reaches the set registered above
+    and asks it for `bath`.
+
+    It lives in one function because it was once written out by hand in
+    two places, in a shape (`custom:renson-bath`) that matches no set at
+    all - `custom` is the prefix for Lovelace *cards*, not icons. Nothing
+    reports that: an unresolvable icon renders as empty space, so it looked
+    like a styling problem and passed every test that checked the string
+    against the same wrong assumption.
+    """
+    return f"{ICON_PREFIX}:{icon}"
+
+
 def build_module() -> str:
     """Return the JavaScript module registering the icon set."""
     return _MODULE_TEMPLATE % (

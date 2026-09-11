@@ -195,6 +195,20 @@ on an active API key.
 
 ### Fixed
 
+- **The room pictograms never appeared.** The icon set registers itself as
+  `renson`, but every icon was asked for as `custom:renson-bath` - which
+  asks the frontend for a set called `custom` (that is the prefix for
+  Lovelace *cards*, not icons) and an icon called `renson-bath`, and gets
+  neither. Nothing reports this: an unresolvable icon renders as empty
+  space, so it read as a styling problem. Icon names are now built in one
+  place and a test holds them to the set actually registered.
+- **The hover panel could hang outside the card** on browsers without CSS
+  anchor positioning - which today means Firefox and Safari, not an exotic
+  corner. The fallback still cannot flip the way anchor positioning does,
+  but it now measures itself and stays inside, and drops below an outlet
+  when there is no room above it. Its pictogram box is also sized up front
+  rather than left to size itself when the icon resolves, which was making
+  the panel jump wider a frame after it appeared.
 - **A correct API key was reported as rejected.** Activating a key is
   asynchronous on the device's side - it has to reach Renson's servers to
   check the key against its own serial, and answers `validating` until

@@ -38,7 +38,8 @@ from homeassistant.util.hass_dict import HassKey
 from .api import DeviceError, HealthboxData, room_symbol, room_valve_port
 from .const import DOMAIN
 from .scene_assets import SCENE_ASSETS, SCENE_GEOMETRY
-from .zone_icons import FALLBACK_ICON, ICON_PREFIX, ROOM_SYMBOL_TO_ICON
+from .icon_set import icon_name
+from .zone_icons import FALLBACK_ICON, ROOM_SYMBOL_TO_ICON
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -209,9 +210,8 @@ def build_layout(hass: HomeAssistant) -> dict[str, Any]:
                         room.id,
                         entities.get("airflow"),
                     ),
-                    "icon": "custom:{}-{}".format(
-                        ICON_PREFIX,
-                        ROOM_SYMBOL_TO_ICON.get(symbol or "", FALLBACK_ICON),
+                    "icon": icon_name(
+                        ROOM_SYMBOL_TO_ICON.get(symbol or "", FALLBACK_ICON)
                     ),
                     "error": port in faulted,
                     "entities": entities,
@@ -519,6 +519,7 @@ class HealthboxCard extends HTMLElement {
         target.style.left = `${node.dataset.left}%%`;
         target.style.top = `${node.dataset.top}%%`;
         tip.hidden = false;
+        if (!ANCHORED) this._keepInside(tip, node);
       };
       const hide = () => {
         tip.hidden = true;
@@ -536,6 +537,34 @@ class HealthboxCard extends HTMLElement {
         this.dispatchEvent(event);
       });
     });
+  }
+
+  _keepInside(tip, node) {
+    // The fallback cannot flip the way anchor positioning does, but it can
+    // still stay inside the card - which matters, because this is the path
+    // Firefox and Safari take today, not a rare one. Measured after the
+    // panel is visible: its width depends on the room's name and readings.
+    //
+    // `left` is the panel's centre (it is translated by -50%%), so keeping
+    // the centre half a panel away from each edge keeps the whole of it in.
+    // A panel wider than the card cannot satisfy that, and is centred.
+    const box = this.querySelector(".hb3");
+    const width = box.clientWidth;
+    const half = tip.offsetWidth / 2;
+    const margin = 4;
+    const centre = (Number(node.dataset.left) / 100) * width;
+    const low = half + margin;
+    const high = width - half - margin;
+    tip.style.left =
+      low > high ? `${width / 2}px` : `${Math.min(Math.max(centre, low), high)}px`;
+
+    // Above the outlet normally, below it when there is no room above -
+    // which is what an outlet on the top edge always runs into.
+    const top = (Number(node.dataset.top) / 100) * box.clientHeight;
+    const fits = top - tip.offsetHeight * 1.15 >= 0;
+    tip.style.transform = fits
+      ? "translate(-50%%, -115%%)"
+      : "translate(-50%%, 15%%)";
   }
 
   _viewBox(byPort) {
@@ -632,7 +661,12 @@ class HealthboxCard extends HTMLElement {
     if (boost && boost.state === "on") detail.push("Boost");
 
     return (
-      `<ha-icon icon="${room.icon}" style="--mdc-icon-size:22px;` +
+      // The box is sized here rather than left to the icon, which resolves
+      // asynchronously: without it the panel is 22px narrower for a frame
+      // and then jumps wider, which both looks like a glitch and makes any
+      // measurement taken on show (see _keepInside) 22px too small.
+      `<ha-icon icon="${room.icon}" style="width:22px;height:22px;flex:none;` +
+      `--mdc-icon-size:22px;` +
       `color:${room.error ? "var(--error-color,#db4437)" : "inherit"}"></ha-icon>` +
       `<span style="line-height:1.35"><b>${label} · ${room.name}${percent}</b>` +
       (where.length

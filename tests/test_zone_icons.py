@@ -1,11 +1,12 @@
 """Checks on the Renson zone pictogram set.
 
-The frontend half of this feature - whether Home Assistant actually draws
-`custom:renson-bath` - cannot be exercised here; there is no frontend in
-the test harness. What can be checked is everything leading up to it: the
-data is complete and well-formed, every symbol resolves to an icon that
-exists, and the JavaScript that registers the set is syntactically what
-the frontend expects.
+Whether Home Assistant actually paints the pictogram cannot be exercised
+here; there is no frontend in the test harness. What can be checked is
+everything leading up to it: the data is complete and well-formed, every
+symbol resolves to an icon that exists, the JavaScript that registers the
+set is what the frontend expects, and - the part that was wrong once and
+that nothing noticed - the names handed to the frontend are addressable
+by the set actually registered.
 """
 
 from __future__ import annotations
@@ -13,7 +14,11 @@ from __future__ import annotations
 import json
 import re
 
-from custom_components.healthbox3.icon_set import ICON_SET_URL, build_module
+from custom_components.healthbox3.icon_set import (
+    ICON_SET_URL,
+    build_module,
+    icon_name,
+)
 from custom_components.healthbox3.zone_icons import (
     FALLBACK_ICON,
     ICON_PREFIX,
@@ -32,6 +37,32 @@ def test_every_symbol_resolves_to_an_icon_that_exists():
         if icon not in ZONE_ICON_PATHS
     }
     assert not missing
+
+
+def test_icon_names_are_addressable_by_the_registered_set():
+    """The name handed to the frontend has to reach the set registered.
+
+    The frontend splits an icon name on its FIRST colon, looks the left
+    half up in `window.customIconsets`, and calls it with the right half.
+    So the name must be `<the set this module registers>:<a key in
+    PATHS>`, and nothing else - `custom:renson-bath`, which this shipped
+    for a while, asks a set called `custom` for an icon called
+    `renson-bath` and gets neither.
+
+    Nothing reports that failure: an unresolvable icon renders as empty
+    space. This test is the only place it can be caught without a browser,
+    so it reads the registered set name back out of the generated module
+    rather than trusting the constant.
+    """
+    registered = re.search(r'window\.customIconsets\[("[^"]+")\]', build_module())
+    assert registered, "the module does not register an icon set"
+    set_name = json.loads(registered.group(1))
+
+    for icon in ZONE_ICON_PATHS:
+        name = icon_name(icon)
+        prefix, _, rest = name.partition(":")
+        assert prefix == set_name, name
+        assert rest in ZONE_ICON_PATHS, name
 
 
 def test_fallback_icon_exists():

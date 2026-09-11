@@ -313,11 +313,11 @@ async def test_room_symbol_sensor_carries_rensons_pictogram(
 
     assert (
         _state(hass, "sensor", v2_data.serial, "room4_symbol").attributes["icon"]
-        == "custom:renson-living"
+        == "renson:living"
     )
     assert (
         _state(hass, "sensor", v2_data.serial, "room3_symbol").attributes["icon"]
-        == "custom:renson-bed"
+        == "renson:bed"
     )
 
 
@@ -342,7 +342,7 @@ async def test_room_symbol_sensor_falls_back_for_an_unknown_symbol(
 
     state = _state(hass, "sensor", odd.serial, "room1_symbol")
     assert state.state == "WineCellar"
-    assert state.attributes["icon"] == "custom:renson-house"
+    assert state.attributes["icon"] == "renson:house"
 
 
 async def test_legislation_code_sensor_created_only_for_rooms_that_report_one(

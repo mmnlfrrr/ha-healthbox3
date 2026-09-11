@@ -63,7 +63,11 @@ ROOM_SYMBOL_TO_ICON: dict[str, str] = {
 # much as ours.
 FALLBACK_ICON = "house"
 
-# The prefix Home Assistant addresses these by, e.g. "custom:renson-bath".
+# The icon set this registers with the frontend. It is also the half of an
+# icon name before the colon: `window.customIconsets["renson"]` is what
+# resolves `renson:bath`. Use icon_set.icon_name() to build those names
+# rather than formatting them by hand - getting the shape wrong renders
+# nothing at all, silently.
 ICON_PREFIX = "renson"
 
 ZONE_ICON_PATHS: dict[str, str] = {
