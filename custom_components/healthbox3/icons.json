@@ -101,6 +101,9 @@
       "room_valve_pressure": {
         "default": "mdi:gauge"
       },
+      "room_valve_port": {
+        "default": "mdi:valve"
+      },
       "room_conductance": {
         "default": "mdi:pipe-valve"
       },

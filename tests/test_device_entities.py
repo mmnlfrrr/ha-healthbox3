@@ -162,6 +162,52 @@ async def test_room_duct_sensors_not_created_without_a_valve_parameter(
 
     assert _state(hass, "sensor", stripped.serial, "room1_valve_pressure") is None
     assert _state(hass, "sensor", stripped.serial, "room1_conductance") is None
+    assert _state(hass, "sensor", stripped.serial, "room1_valve_port") is None
+
+
+async def test_valve_port_sensor_reports_the_wired_port_not_the_room_id(
+    hass, mock_api_client, v2_data, boost_status, device_telemetry
+):
+    """Room id and collector port happen to be equal on the fixture unit,
+    so the port is rewired here - otherwise the test would pass just as
+    well against a sensor that echoed the room id.
+    """
+    rewired = copy.deepcopy(v2_data)
+    next(r for r in rewired.rooms if r.id == 1).parameters["valve"].value = "6"
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=rewired.serial,
+        healthbox_data=rewired,
+        boost_status=boost_status,
+        device=device_telemetry,
+    )
+
+    assert _state(hass, "sensor", rewired.serial, "room1_valve_port").state == "6"
+
+
+async def test_valve_port_sensor_does_not_need_the_duct_model(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """Unlike pressure and conductance, the port comes from data/current,
+    not from /v1/device - so it stays readable on a unit whose duct model
+    isn't reported (uncalibrated, or the endpoint unreachable).
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        device=None,
+    )
+
+    assert _state(hass, "sensor", v2_data.serial, "room1_valve_port").state == "1"
+    assert (
+        _state(hass, "sensor", v2_data.serial, "room1_valve_pressure").state
+        == "unavailable"
+    )
 
 
 async def test_wifi_status_sensor_reports_state_and_ssid_attribute(

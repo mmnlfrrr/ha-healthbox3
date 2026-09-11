@@ -182,6 +182,9 @@
       "room_valve_pressure": {
         "name": "Pression de la vanne"
       },
+      "room_valve_port": {
+        "name": "Numéro de bouche"
+      },
       "room_conductance": {
         "name": "Conductance de la gaine"
       },

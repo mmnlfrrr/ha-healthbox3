@@ -182,6 +182,9 @@
       "room_valve_pressure": {
         "name": "Valve pressure"
       },
+      "room_valve_port": {
+        "name": "Valve port"
+      },
       "room_conductance": {
         "name": "Duct conductance"
       },

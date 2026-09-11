@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Valve port` sensor per room (diagnostic): which collector port the
+  room's valve is wired to - the number printed on the unit, and the one
+  the Renson app lists rooms by. Already used internally to join rooms to
+  the duct model, now exposed so a schematic or floor-plan dashboard can
+  place each room against the right outlet instead of hardcoding the
+  layout per install. Unlike `Valve pressure` and `Duct conductance`, it
+  comes from `data/current` rather than the duct model, so it stays
+  readable on an uncalibrated unit.
 - `Energy` sensor: cumulative kWh, usable in the Energy dashboard as-is,
   with no Riemann-sum helper to wire up by hand. Integrated from the
   whole-device `Power` reading, trapezoidally between polls, with the

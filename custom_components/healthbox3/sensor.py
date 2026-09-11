@@ -320,6 +320,9 @@ async def async_setup_entry(
         # show - not an error, just a room these two entities skip.
         if room_valve_port(room) is not None:
             entities.append(
+                Healthbox3RoomValvePortSensor(coordinator, serial, room.id, room.name)
+            )
+            entities.append(
                 Healthbox3RoomValvePressureSensor(coordinator, serial, room.id, room.name)
             )
             entities.append(
@@ -898,6 +901,29 @@ class Healthbox3RoomNominalAirflowSensor(_Healthbox3RoomValueSensor):
     @override
     def _room_value(self, room: Room) -> float | None:
         return _room_nominal_flow(room)
+
+
+class Healthbox3RoomValvePortSensor(_Healthbox3RoomValueSensor):
+    """Which collector port a room's valve is wired to.
+
+    The number printed next to the port on the unit itself, and the one
+    the Renson app lists rooms by - so it's what a floor-plan or
+    schematic-style dashboard needs in order to place each room against
+    the right outlet, instead of the placement being hardcoded per
+    install.
+
+    A commissioning constant, not a reading: no state class (averaging a
+    port number is meaningless) and no unit.
+    """
+
+    _attr_state_class = None
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "room_valve_port"
+    _unique_id_suffix = "valve_port"
+
+    @override
+    def _room_value(self, room: Room) -> float | None:
+        return room_valve_port(room)
 
 
 class _Healthbox3RoomDuctSensor(_Healthbox3RoomValueSensor):

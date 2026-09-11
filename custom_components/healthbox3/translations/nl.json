@@ -182,6 +182,9 @@
       "room_valve_pressure": {
         "name": "Klepdruk"
       },
+      "room_valve_port": {
+        "name": "Klepaansluiting"
+      },
       "room_conductance": {
         "name": "Kanaalconductantie"
       },
