@@ -243,25 +243,35 @@ const PORTS = {
   7: ["top", P25],
 };
 
-const place = (port, art) => {
+// A split outlet is a chain: the branches sit end to end running away
+// from the unit, 1.1 against the casing then 1.2 beyond it, which is how
+// the Renson app draws it. `step` is how far out each further branch is,
+// and it is the drawing's own width so the brackets butt up against each
+// other with no gap.
+const outward = (side) =>
+  side === "left" || side === "right" ? G.valve_side_w : G.valve_end_h;
+
+const place = (port, art, branch = 0) => {
   const [side, a] = PORTS[port];
   const sw = G.valve_side_w, sh = G.valve_side_h;
   const ew = G.valve_end_w, eh = G.valve_end_h;
+  const out = outward(side) * branch;
   if (side === "left")
-    return `<g transform="translate(${G.base_x - sw},${a - sh / 2})">${ASSETS[art + "_left"]}</g>`;
+    return `<g transform="translate(${G.base_x - sw - out},${a - sh / 2})">${ASSETS[art + "_left"]}</g>`;
   if (side === "right")
-    return `<g transform="translate(${G.base_x + G.base_size + sw},${a - sh / 2}) scale(-1,1)">${ASSETS[art + "_left"]}</g>`;
+    return `<g transform="translate(${G.base_x + G.base_size + sw + out},${a - sh / 2}) scale(-1,1)">${ASSETS[art + "_left"]}</g>`;
   if (side === "top")
-    return `<g transform="translate(${a - ew / 2},${G.base_y - eh})">${ASSETS[art + "_top"]}</g>`;
-  return `<g transform="translate(${a - ew / 2},${G.base_y + G.base_size + eh}) scale(1,-1)">${ASSETS[art + "_top"]}</g>`;
+    return `<g transform="translate(${a - ew / 2},${G.base_y - eh - out})">${ASSETS[art + "_top"]}</g>`;
+  return `<g transform="translate(${a - ew / 2},${G.base_y + G.base_size + eh + out}) scale(1,-1)">${ASSETS[art + "_top"]}</g>`;
 };
 
-const badgeAt = (port) => {
+const badgeAt = (port, branch = 0) => {
   const [side, a] = PORTS[port];
-  if (side === "left") return [G.base_x - G.valve_side_w / 2, a];
-  if (side === "right") return [G.base_x + G.base_size + G.valve_side_w / 2, a];
-  if (side === "top") return [a, G.base_y - G.valve_end_h / 2];
-  return [a, G.base_y + G.base_size + G.valve_end_h / 2];
+  const out = outward(side) * branch;
+  if (side === "left") return [G.base_x - G.valve_side_w / 2 - out, a];
+  if (side === "right") return [G.base_x + G.base_size + G.valve_side_w / 2 + out, a];
+  if (side === "top") return [a, G.base_y - G.valve_end_h / 2 - out];
+  return [a, G.base_y + G.base_size + G.valve_end_h / 2 + out];
 };
 
 class HealthboxCard extends HTMLElement {
@@ -363,9 +373,9 @@ class HealthboxCard extends HTMLElement {
         parts.push(place(port, "valve_closed"));
         continue;
       }
-      parts.push(
-        place(port, rooms.some((r) => r.error) ? "valve_manual_error" : "valve_manual"),
-      );
+      rooms.forEach((room, i) => {
+        parts.push(place(port, room.error ? "valve_manual_error" : "valve_manual", i));
+      });
     }
 
     for (const [port, rooms] of byPort) {
@@ -400,19 +410,12 @@ class HealthboxCard extends HTMLElement {
   }
 
   _outlet(port, rooms) {
-    const [cx, cy] = badgeAt(port);
     const [side] = PORTS[port];
     const split = rooms.length > 1;
-    // Branch badges fan out along the edge rather than stacking on the
-    // outlet, which is what would collide once a port carries three.
-    const spread = 26;
-    const axis = side === "left" || side === "right" ? "y" : "x";
 
     return rooms
       .map((room, i) => {
-        const shift = split ? (i - (rooms.length - 1) / 2) * spread : 0;
-        const bx = axis === "x" ? cx + shift : cx;
-        const by = axis === "y" ? cy + shift : cy;
+        const [bx, by] = badgeAt(port, i);
         const label = split ? `${port}.${i + 1}` : String(port);
         const clickable = room.entities.airflow || room.entities.boost || "";
         const colour = room.error ? "var(--error-color,#db4437)" : "currentColor";

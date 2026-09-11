@@ -225,6 +225,24 @@ def test_card_module_draws_tooltips_and_branch_labels():
     assert "valve_manual_error" in module
 
 
+def test_card_module_chains_branches_outward():
+    """A split outlet's branches run end to end away from the unit, which
+    is how the Renson installer app draws them - not fanned out along the
+    edge, which is what this card did first.
+
+    The placement itself was checked by running the module and rasterising
+    the result against that app's own screen; what is pinned here is that
+    both the artwork and its badge take the same branch offset, since one
+    without the other puts the number on the wrong bracket.
+    """
+    module = build_card_module()
+
+    assert "const outward = (side) =>" in module
+    assert "const place = (port, art, branch = 0)" in module
+    assert "const badgeAt = (port, branch = 0)" in module
+    assert "outward(side) * branch" in module
+
+
 def test_layout_is_empty_before_any_unit_is_set_up(hass):
     """The view answers on a bare install too, rather than raising."""
     assert build_layout(hass) == {"units": []}
