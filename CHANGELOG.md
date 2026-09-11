@@ -33,6 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the shorter names. Only a fresh install (or a removed-and-re-added
   integration) gets the shorter entity IDs.
 
+### Changed
+
+- Ventilation profile icons now match the ones Renson's own app uses: a
+  plain heart for `health` (was a heart-with-pulse-line) and a tornado for
+  `intense` (was the generic wind glyph). The wind glyph is also the
+  default icon of three airflow/ventilation sensors, so `intense` used to
+  be visually indistinguishable from them in a list. `eco` keeps its leaf,
+  which already matched.
+
 ### Added
 
 - `Room symbol` sensor per room (diagnostic): which pictogram the device

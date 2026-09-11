@@ -125,8 +125,8 @@
         "default": "mdi:tune-variant",
         "state": {
           "eco": "mdi:leaf",
-          "health": "mdi:heart-pulse",
-          "intense": "mdi:weather-windy"
+          "health": "mdi:heart",
+          "intense": "mdi:weather-tornado"
         }
       }
     },
