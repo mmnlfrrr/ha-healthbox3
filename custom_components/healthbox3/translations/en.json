@@ -88,11 +88,11 @@
         "state_attributes": {
           "qualification": {
             "state": {
-              "very_good": "Very good",
+              "very_good": "Excellent",
               "good": "Good",
               "moderate": "Moderate",
-              "poor": "Poor",
-              "very_poor": "Very poor"
+              "poor": "Bad",
+              "very_poor": "Very bad"
             }
           }
         }
@@ -100,11 +100,11 @@
       "room_aqi_level": {
         "name": "AQI level",
         "state": {
-          "very_good": "Very good",
+          "very_good": "Excellent",
           "good": "Good",
           "moderate": "Moderate",
-          "poor": "Poor",
-          "very_poor": "Very poor"
+          "poor": "Bad",
+          "very_poor": "Very bad"
         }
       },
       "room_airflow": {
@@ -115,11 +115,11 @@
         "state_attributes": {
           "qualification": {
             "state": {
-              "very_good": "Very good",
+              "very_good": "Excellent",
               "good": "Good",
               "moderate": "Moderate",
-              "poor": "Poor",
-              "very_poor": "Very poor"
+              "poor": "Bad",
+              "very_poor": "Very bad"
             }
           }
         }
@@ -127,11 +127,11 @@
       "global_aqi_level": {
         "name": "AQI level",
         "state": {
-          "very_good": "Very good",
+          "very_good": "Excellent",
           "good": "Good",
           "moderate": "Moderate",
-          "poor": "Poor",
-          "very_poor": "Very poor"
+          "poor": "Bad",
+          "very_poor": "Very bad"
         }
       },
       "global_ventilation_level": {

@@ -640,6 +640,19 @@ def room_valve_port(room: Room) -> int | None:
 # always paired with a qualification label - hence this being surfaced
 # as an attribute alongside, not instead of, the raw AQI value.
 #
+# Cross-checked against Renson's own Android app, which shows only four
+# air-quality labels (its resources are label_pollution_excellent /
+# _good / _moderate / _bad). That is a naming difference, not a rival
+# scale: the app never derives a level from a number - its
+# PollutionLevelJsonConversion reads the level as a *string* straight out
+# of the cloud response (PollutionLevel_Conversions::strToPollutionLevel,
+# ::getPollutionLevel(Json::Value)), so it carries no thresholds at all
+# and cannot contradict the boundaries above. The four names it does use
+# are adopted as our display labels, the app's "excellent" included; the
+# fifth band keeps the "very bad" of Renson's own reply, since a value
+# past 100 has to land somewhere and the app has never been observed
+# showing one.
+#
 # Two caveats Renson also raised, not encoded in this function since
 # they're about cross-value comparison rather than a single value's
 # label - see README's Known limitations: the index is built per-room

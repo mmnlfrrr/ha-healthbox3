@@ -88,9 +88,9 @@
         "state_attributes": {
           "qualification": {
             "state": {
-              "very_good": "Très bon",
+              "very_good": "Excellent",
               "good": "Bon",
-              "moderate": "Modéré",
+              "moderate": "Moyen",
               "poor": "Mauvais",
               "very_poor": "Très mauvais"
             }
@@ -115,9 +115,9 @@
         "state_attributes": {
           "qualification": {
             "state": {
-              "very_good": "Très bon",
+              "very_good": "Excellent",
               "good": "Bon",
-              "moderate": "Modéré",
+              "moderate": "Moyen",
               "poor": "Mauvais",
               "very_poor": "Très mauvais"
             }

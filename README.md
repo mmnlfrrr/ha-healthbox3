@@ -37,7 +37,7 @@ taking that on, please open a GitHub issue to discuss it.
 - Per-room sensors for whichever of temperature, humidity, CO2, VOC and air
   quality index your device's hardware actually reports (varies by room).
   Each air quality index reading is paired with a qualification label
-  (Very good/Good/Moderate/Poor/Very poor), per Renson's own guidance - both
+  (Excellent/Good/Moderate/Bad/Very bad), on Renson's own scale - both
   as a `qualification` attribute on the numeric sensor, and as a
   standalone `AQI level` sensor whose own state is that label, for a
   dashboard tile that reads "Good" at a glance instead of a raw number -
@@ -204,7 +204,7 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `<room> CO2` | Only created for rooms with a CO2 sensor; reads "unavailable" if the device reports it as not-yet-sampled |
 | `sensor` | `<room> VOC` | Only created for rooms with a VOC sensor |
 | `sensor` | `<room> Air quality index` | Only created for rooms with an air quality sensor; exposes `main_pollutant` when set, plus a `qualification` band (see [Known limitations](#known-limitations)) |
-| `sensor` | `<room> AQI level` | That same qualification band (Very good/Good/Moderate/Poor/Very poor) as its own state, for dashboards - created alongside `<room> Air quality index` |
+| `sensor` | `<room> AQI level` | That same qualification band (Excellent/Good/Moderate/Bad/Very bad) as its own state, for dashboards - created alongside `<room> Air quality index` |
 | `sensor` | `<room> Airflow` | Current airflow as % of that room's rated (nominal) flow; not capped at 100% - only created for rooms reporting both underlying values |
 | `sensor` | `Air quality index` | Whole-house AQI; exposes `main_pollutant`, `room`, and a `qualification` band (see [Known limitations](#known-limitations)) |
 | `sensor` | `AQI level` | That same whole-house qualification band as its own state, for dashboards - created alongside `Air quality index` |

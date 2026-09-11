@@ -48,6 +48,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   air quality scale (`Excellent`/`Moyen` rather than `Très bon`/`Modéré`).
   `Exhaust pressure` was also a mistranslation of this integration's own
   English, independently of Renson.
+- **The air quality bands now carry Renson's own names in every language,
+  everywhere they appear.** English reads Excellent/Good/Moderate/Bad/Very
+  bad, matching the four labels in Renson's app plus a fifth for values
+  past 100; Dutch already used Renson's own Dutch words and is unchanged.
+  The re-wording above had reached only the `AQI level` sensors, leaving
+  the identical band named `Modéré` in the `qualification` attribute of
+  the sensor feeding them and `Moyen` on the tile - one band, two words. A
+  test now holds all four naming sites to a single vocabulary.
+
+  The boundaries themselves are untouched, and remain Renson's: the app
+  reads its label as a string from the cloud rather than deriving it from
+  a number, so it has no thresholds of its own to adopt. Band *states* are
+  unchanged keys, so history and automations are unaffected.
 
 ### Added
 

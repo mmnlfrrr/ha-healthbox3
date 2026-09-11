@@ -20,6 +20,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from custom_components.healthbox3.api import AQI_QUALIFICATION_LEVELS
 from custom_components.healthbox3.const import PROFILES
 
 _HEALTHBOX3_DIR = Path(__file__).parent.parent / "custom_components" / "healthbox3"
@@ -74,6 +75,52 @@ def test_translations_fr_matches_en_key_structure():
     assert _key_shape(_load_json(TRANSLATIONS_FR_PATH)) == _key_shape(
         _load_json(TRANSLATIONS_EN_PATH)
     )
+
+
+def _aqi_band_label_sites(data: Any) -> dict[str, dict[str, str]]:
+    """Return every place a translations file names the AQI qualification
+    bands, keyed by a readable site name.
+
+    The same band is named in four places per file: as the `qualification`
+    attribute of each of the two numeric AQI sensors, and as the state of
+    each of the two `AQI level` sensors.
+    """
+    sensors = data["entity"]["sensor"]
+    return {
+        "room_aqi.qualification": sensors["room_aqi"]["state_attributes"][
+            "qualification"
+        ]["state"],
+        "global_aqi.qualification": sensors["global_aqi"]["state_attributes"][
+            "qualification"
+        ]["state"],
+        "room_aqi_level": sensors["room_aqi_level"]["state"],
+        "global_aqi_level": sensors["global_aqi_level"]["state"],
+    }
+
+
+def test_every_aqi_band_is_named_once_per_language():
+    """One band, one word - in every language, everywhere it appears.
+
+    The four sites are the same scale seen from different entities, so a
+    user reading "Moyen" on a dashboard tile and "Modéré" in the
+    attributes of the sensor feeding it is looking at one band wearing
+    two names. That is exactly what shipped once already, when only the
+    `AQI level` sensors were re-worded to match Renson's app.
+
+    Keys are derived from AQI_QUALIFICATION_LEVELS, so a band added in
+    code without a label fails here rather than showing its raw key.
+    """
+    for path in (
+        STRINGS_PATH,
+        TRANSLATIONS_EN_PATH,
+        TRANSLATIONS_NL_PATH,
+        TRANSLATIONS_FR_PATH,
+    ):
+        sites = _aqi_band_label_sites(_load_json(path))
+        reference_name, reference = next(iter(sites.items()))
+        assert set(reference) == set(AQI_QUALIFICATION_LEVELS), path.name
+        for name, labels in sites.items():
+            assert labels == reference, f"{path.name}: {name} != {reference_name}"
 
 
 def test_every_select_option_is_translated():
