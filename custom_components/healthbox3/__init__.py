@@ -5,11 +5,13 @@ from __future__ import annotations
 from homeassistant.const import CONF_API_KEY, CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import Healthbox3ApiClient, Healthbox3ConnectionError, Healthbox3Error
 from .card import async_register as async_register_card
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
+from .entity import unit_device_info
 from .icon_set import async_register as async_register_icon_set
 
 PLATFORMS = [
@@ -66,6 +68,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -
         hass, entry, client, use_v2=use_v2
     )
     await coordinator.async_config_entry_first_refresh()
+
+    # The unit's device entry is created here, before any platform, rather
+    # than being left to whichever entity happens to be added first. Each
+    # room device nests under it by registry id (`via_device_id`), and a
+    # registry id only exists once the device does - so the order has to be
+    # guaranteed rather than inferred from the platform list.
+    coordinator.unit_device_id = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        **unit_device_info(coordinator, coordinator.data.healthbox.serial),
+    ).id
 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

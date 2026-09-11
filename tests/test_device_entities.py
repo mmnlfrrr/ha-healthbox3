@@ -13,6 +13,7 @@ controls.
 from __future__ import annotations
 
 import copy
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -313,11 +314,11 @@ async def test_room_symbol_sensor_carries_rensons_pictogram(
 
     assert (
         _state(hass, "sensor", v2_data.serial, "room4_symbol").attributes["icon"]
-        == "renson:living"
+        == "healthbox:living"
     )
     assert (
         _state(hass, "sensor", v2_data.serial, "room3_symbol").attributes["icon"]
-        == "renson:bed"
+        == "healthbox:bed"
     )
 
 
@@ -342,7 +343,7 @@ async def test_room_symbol_sensor_falls_back_for_an_unknown_symbol(
 
     state = _state(hass, "sensor", odd.serial, "room1_symbol")
     assert state.state == "WineCellar"
-    assert state.attributes["icon"] == "renson:house"
+    assert state.attributes["icon"] == "healthbox:house"
 
 
 async def test_legislation_code_sensor_created_only_for_rooms_that_report_one(
@@ -659,3 +660,66 @@ async def test_energy_sensor_is_an_energy_dashboard_total(
     assert state.attributes["device_class"] == "energy"
     assert state.attributes["state_class"] == "total_increasing"
     assert state.attributes["unit_of_measurement"] == "kWh"
+
+
+async def test_every_room_nests_under_the_unit(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The whole point of one device per room is that they hang off the unit.
+
+    Nothing asserted this until the link moved from `via_device` (a pair of
+    identifiers) to `via_device_id` (the unit's registry id). The distinction
+    matters: a wrong or missing id does not raise, it just leaves the rooms
+    standing next to the unit as unrelated appliances, which reads as a
+    cosmetic quirk rather than a bug.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    unit = _unit_device_entry(hass, entry, v2_data.serial)
+    assert unit is not None
+
+    registry = dr.async_get(hass)
+    rooms = [
+        device
+        for device in dr.async_entries_for_config_entry(registry, entry.entry_id)
+        if device.id != unit.id
+    ]
+    assert len(rooms) == len(v2_data.rooms)
+    assert {device.via_device_id for device in rooms} == {unit.id}
+
+
+async def test_setup_logs_no_deprecation_warning(
+    hass, caplog, mock_api_client, v2_data, boost_status
+):
+    """Home Assistant reports deprecated API use against the integration by
+    name, in the user's own log, with a link to this project's issue tracker
+    and the version it will start failing in.
+
+    That is a user-visible defect even while everything still works, and it
+    is invisible to every other test here - `via_device` produced three of
+    these on every single startup and the suite stayed green. Scoped to this
+    integration's own reports so an unrelated warning elsewhere in Home
+    Assistant does not fail it.
+    """
+    caplog.set_level(logging.WARNING)
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    reports = [
+        record.getMessage()
+        for record in caplog.records
+        if f"custom integration '{DOMAIN}'" in record.getMessage()
+        and "deprecated" in record.getMessage()
+    ]
+    assert not reports

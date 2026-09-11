@@ -145,6 +145,11 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         )
         self._relocate_attempted = False
         self._tracked_error_issue_ids: set[str] = set()
+        # The registry id of the unit's own device entry, which each room
+        # device points at to nest under it. Filled in by async_setup_entry
+        # before any platform is forwarded - see entity.py's _room_device
+        # for why it cannot be worked out from the room's side.
+        self.unit_device_id: str | None = None
 
     @override
     async def _async_update_data(self) -> Healthbox3Data:

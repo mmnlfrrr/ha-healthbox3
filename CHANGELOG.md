@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Each ventilated room is now its own device**, linked back to the unit
-  via `via_device`, instead of every entity sitting on one device. The unit
+  by `via_device_id`, instead of every entity sitting on one device. The unit
   device keeps everything describing the appliance as a whole (air quality,
   ventilation level, power, fan readings, `Boost all`, demand control,
   Silent, diagnostics); room-scoped entities move to their room's device.
@@ -99,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Each room is now illustrated with Renson's own pictogram.** The
   `Room symbol` sensor carries the drawing Renson's app uses for that
   room - bathtub, chef's hat, toilet, bed - with no per-install setup. The
-  icons ship as a `custom:renson-*` icon set the integration serves to the
+  icons ship as a `healthbox:*` icon set the integration serves to the
   frontend.
 
   21 of Renson's 23 zone pictograms are shipped as-is. Two cannot be:
@@ -195,13 +195,37 @@ on an active API key.
 
 ### Fixed
 
-- **The room pictograms never appeared.** The icon set registers itself as
-  `renson`, but every icon was asked for as `custom:renson-bath` - which
-  asks the frontend for a set called `custom` (that is the prefix for
-  Lovelace *cards*, not icons) and an icon called `renson-bath`, and gets
-  neither. Nothing reports this: an unresolvable icon renders as empty
-  space, so it read as a styling problem. Icon names are now built in one
-  place and a test holds them to the set actually registered.
+- **Each startup logged three deprecation warnings naming this
+  integration.** Rooms were linked to the unit with `via_device`, which
+  Home Assistant has replaced with `via_device_id`; it still worked, but
+  wrote "Detected that custom integration 'healthbox3' ... will stop
+  working in Home Assistant 2027.8.0" into the user's log on every setup,
+  with a link to this project's issue tracker. It would have stopped
+  working outright in 2027.8.
+
+  The link is not a rename: `via_device_id` wants the unit's registry id,
+  which only exists once its device does. The unit's device entry is now
+  created explicitly during setup, before any platform is forwarded, so
+  the id is guaranteed to be there rather than inferred from the order the
+  platforms happen to be listed in. Existing installs are unaffected - the
+  id is the same one the registry had already resolved.
+
+  Two tests came with it: one asserting every room actually nests under the
+  unit, which nothing checked before, and one asserting setup logs no
+  deprecation report at all - `via_device` produced three on every startup
+  and the suite stayed green throughout.
+- **The room pictograms never appeared.** Every icon was asked for as
+  `custom:renson-bath`, which asks the frontend for a set called `custom`
+  (that is the prefix for Lovelace *cards*, not icons) and an icon called
+  `renson-bath`, and gets neither. Nothing reports this: an unresolvable
+  icon renders as empty space, so it read as a styling problem. They are
+  now `healthbox:bath`, built in one place, and a test holds them to the
+  set actually registered.
+
+  The set is named after the product rather than the manufacturer on
+  purpose: `window.customIconsets` is one namespace shared by every
+  integration in the frontend, first registration wins, and Home Assistant
+  core already ships an integration whose domain is `renson`.
 - **The hover panel could hang outside the card** on browsers without CSS
   anchor positioning - which today means Firefox and Safari, not an exotic
   corner. The fallback still cannot flip the way anchor positioning does,

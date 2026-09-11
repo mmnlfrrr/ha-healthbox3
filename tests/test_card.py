@@ -54,7 +54,7 @@ async def test_layout_reports_rooms_by_collector_port(
 
     toilet = unit["rooms"][0]
     assert toilet["name"] == "Toilet"
-    assert toilet["icon"] == "renson:toilet"
+    assert toilet["icon"] == "healthbox:toilet"
     assert toilet["entities"]["airflow"].startswith("sensor.")
     assert toilet["entities"]["boost"].startswith("fan.")
 
@@ -75,8 +75,8 @@ async def test_layout_uses_the_pictogram_the_device_picked(
 
     rooms = {room["id"]: room for room in build_layout(hass)["units"][0]["rooms"]}
 
-    assert rooms[3]["icon"] == "renson:bed"
-    assert rooms[4]["icon"] == "renson:living"
+    assert rooms[3]["icon"] == "healthbox:bed"
+    assert rooms[4]["icon"] == "healthbox:living"
 
 
 async def test_layout_skips_a_room_with_no_collector_port(

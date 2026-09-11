@@ -1,10 +1,11 @@
-"""Serve Renson's zone pictograms to the frontend as a `custom:` icon set.
+"""Serve Renson's zone pictograms to the frontend as a named icon set.
 
 Home Assistant has no per-device icon, so a room's own pictogram can only
 appear on an entity. Entity icons are addressed by name, not by artwork,
 and the only way to add names is a frontend icon set: a small JavaScript
-module that registers `window.customIconsets[prefix]`, which the frontend
-then calls to resolve `custom:<prefix>-<name>`.
+module that registers `window.customIconsets["healthbox"]`, which the
+frontend then calls to resolve `healthbox:bath` - the same shape as
+`mdi:leaf`, and the same mechanism.
 
 So this module does two things at setup: publish that JavaScript, and
 tell the frontend to load it. The icon data itself is generated from
@@ -60,7 +61,7 @@ def icon_name(icon: str) -> str:
     `<set>:<icon>` - the same shape as `mdi:leaf`, because it is the same
     mechanism: the frontend splits an icon name on its first colon, looks
     the left half up in `window.customIconsets`, and calls it with the
-    right half. `renson:bath` therefore reaches the set registered above
+    right half. `healthbox:bath` therefore reaches the set registered above
     and asks it for `bath`.
 
     It lives in one function because it was once written out by hand in

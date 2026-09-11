@@ -1,7 +1,7 @@
 """Shared base entity for the Renson Healthbox 3 integration.
 
 The unit is registered as one device, and **each ventilated room as its own
-device** linked back to it via `via_device`.
+device** linked back to it by `via_device_id`.
 
 That split is what makes areas usable. Home Assistant assigns areas per
 device, so with every entity under a single device the only way to put the
@@ -59,16 +59,20 @@ class Healthbox3Entity(CoordinatorEntity[Healthbox3DataUpdateCoordinator]):
         super().__init__(coordinator)
         self._serial = serial
         self._attr_device_info = (
-            _unit_device(coordinator, serial)
+            unit_device_info(coordinator, serial)
             if room is None
-            else _room_device(serial, room)
+            else _room_device(coordinator, serial, room)
         )
 
 
-def _unit_device(
+def unit_device_info(
     coordinator: Healthbox3DataUpdateCoordinator, serial: str
 ) -> DeviceInfo:
     """Build the device entry for the unit itself.
+
+    Public because async_setup_entry creates this device up front, before
+    any platform, so that its registry id exists for the rooms to point
+    at - see _room_device below.
 
     `connections` and `configuration_url` are filled in from
     `/renson_core/v2/global` when it answers. The MAC is what lets Home
@@ -95,37 +99,42 @@ def _unit_device(
     return device
 
 
-def _room_device(serial: str, room: RoomRef) -> DeviceInfo:
+def _room_device(
+    coordinator: Healthbox3DataUpdateCoordinator, serial: str, room: RoomRef
+) -> DeviceInfo:
     """Build the device entry for one room.
 
-    `via_device` points at the unit, so rooms nest under it in the UI rather
-    than looking like three unrelated appliances. The unit's own device entry
-    is always created first: the binary sensor platform is set up before every
-    other one (see PLATFORMS in __init__.py) and always adds at least the
-    advanced-access entity, which is unit-scoped.
+    `via_device_id` points at the unit, so rooms nest under it in the UI
+    rather than looking like three unrelated appliances. It wants the unit's
+    *registry id*, not its identifiers, which is why async_setup_entry
+    creates the unit's device before forwarding any platform and leaves the
+    id on the coordinator: by the time any entity exists, a platform has
+    been forwarded, so the id is set.
+
+    That replaces the older `via_device=(DOMAIN, serial)`, which Home
+    Assistant deprecated. It still worked, but logged a deprecation warning
+    naming this integration on every startup, and was due to start raising
+    in Home Assistant 2027.8.
+
+    The assert is deliberate rather than a quiet `if`: a missing id would
+    mean the rooms silently stop nesting, which looks like a cosmetic
+    regression and would go unnoticed. Home Assistant catches this, logs it
+    against the entity, and the rooms' entities are visibly absent.
 
     No `serial_number`: only the unit has one. The model is "Air valve",
     which is what a Renson "room" physically is from the unit's side - one
     collector port with a motorised valve on it (`"type": "air valve"` in
     the device's own actuator list).
-
-    Known deprecation, deliberately not acted on yet: Home Assistant has
-    dropped `via_device` from the `DeviceInfo` TypedDict in favour of
-    `via_device_id`, so mypy flags the key below as unknown. The registry
-    still accepts it at runtime and only stops in 2027.8 (see
-    `_DEPRECATED_DEVICE_INFO_PARAMETERS` in core's device_registry).
-    Moving over is not a rename: `via_device_id` wants the unit's
-    *registry id*, which this function does not have and which only exists
-    once the unit's device entry does - so it needs a registry lookup here
-    and a way to fail visibly rather than silently un-nesting every room.
-    That is its own change, with its own tests.
     """
+    assert coordinator.unit_device_id is not None, (
+        "the unit's device must be created before any room entity exists"
+    )
     return DeviceInfo(
         identifiers={(DOMAIN, f"{serial}_room{room.id}")},
         manufacturer="Renson",
         model="Air valve",
         name=room.name,
-        via_device=(DOMAIN, serial),
+        via_device_id=coordinator.unit_device_id,
     )
 
 

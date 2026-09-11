@@ -64,11 +64,18 @@ ROOM_SYMBOL_TO_ICON: dict[str, str] = {
 FALLBACK_ICON = "house"
 
 # The icon set this registers with the frontend. It is also the half of an
-# icon name before the colon: `window.customIconsets["renson"]` is what
-# resolves `renson:bath`. Use icon_set.icon_name() to build those names
+# icon name before the colon: `window.customIconsets["healthbox"]` is what
+# resolves `healthbox:bath`. Use icon_set.icon_name() to build those names
 # rather than formatting them by hand - getting the shape wrong renders
 # nothing at all, silently.
-ICON_PREFIX = "renson"
+#
+# Named after the product, not the manufacturer, on purpose.
+# `window.customIconsets` is one namespace shared by every integration in
+# the frontend, first registration wins, and Home Assistant core already
+# ships an integration whose domain is `renson` (the Endura Delta). Taking
+# `renson` there would be claiming a name that is not this integration's to
+# claim, and a collision shows up as icons that silently stop resolving.
+ICON_PREFIX = "healthbox"
 
 ZONE_ICON_PATHS: dict[str, str] = {
     "baby": (
