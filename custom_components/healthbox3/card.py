@@ -33,6 +33,7 @@ from homeassistant.helpers import (
     device_registry as dr,
     entity_registry as er,
 )
+from homeassistant.util.hass_dict import HassKey
 
 from .api import DeviceError, HealthboxData, room_symbol, room_valve_port
 from .const import DOMAIN
@@ -43,7 +44,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CARD_URL = f"/{DOMAIN}/healthbox-card.js"
 LAYOUT_URL = f"/api/{DOMAIN}/layout"
-_REGISTERED_KEY = f"{DOMAIN}_card_registered"
+_REGISTERED_KEY: HassKey[bool] = HassKey(f"{DOMAIN}_card_registered")
 
 # Which of a room's entities the card draws. Keyed by the suffix of the
 # unique id each one is registered under, so the lookup goes through the
@@ -279,8 +280,7 @@ def build_card_module() -> str:
 
 async def async_register(hass: HomeAssistant) -> None:
     """Publish the card and its layout endpoint. Idempotent."""
-    data: dict[str, Any] = hass.data
-    if data.get(_REGISTERED_KEY):
+    if hass.data.get(_REGISTERED_KEY):
         return
 
     try:
@@ -294,7 +294,7 @@ async def async_register(hass: HomeAssistant) -> None:
         )
         return
 
-    data[_REGISTERED_KEY] = True
+    hass.data[_REGISTERED_KEY] = True
 
 
 # The card. Ports are numbered the way Renson numbers them: 1 is the

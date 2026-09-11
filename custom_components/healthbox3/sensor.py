@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from decimal import Decimal
 from time import monotonic
 from typing import override
 
@@ -919,7 +920,10 @@ class _Healthbox3RoomValueSensor(Healthbox3Entity, SensorEntity):
     availability, naming) is shared.
     """
 
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    # Annotated, not just assigned: most rooms sensors are measurements,
+    # but a commissioning constant like the valve port is not, and a
+    # subclass has to be able to say so by setting None.
+    _attr_state_class: SensorStateClass | None = SensorStateClass.MEASUREMENT
     _unique_id_suffix: str
 
     def __init__(
@@ -1284,12 +1288,19 @@ class Healthbox3EnergySensor(Healthbox3Entity, RestoreSensor):
         last = await self.async_get_last_sensor_data()
         if last is None or last.native_value is None:
             return
-        try:
-            self._total_kwh = float(last.native_value)
-        except (TypeError, ValueError):
-            # A restored state that isn't a number means starting over is the
-            # only safe option; TOTAL_INCREASING covers the resulting drop.
-            self._total_kwh = 0.0
+        restored = last.native_value
+        # A restored state can be any of the types a sensor may store,
+        # dates included - a date where a kWh total should be is as
+        # unusable as an unparseable string, and both land below.
+        if isinstance(restored, (int, float, str, Decimal)):
+            try:
+                self._total_kwh = float(restored)
+                return
+            except (TypeError, ValueError):
+                pass
+        # A restored state that isn't a number means starting over is the
+        # only safe option; TOTAL_INCREASING covers the resulting drop.
+        self._total_kwh = 0.0
 
     @override
     def _handle_coordinator_update(self) -> None:

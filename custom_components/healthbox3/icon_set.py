@@ -23,13 +23,13 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 
 from aiohttp import web
 
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
+from homeassistant.util.hass_dict import HassKey
 
 from .const import DOMAIN
 from .zone_icons import ICON_PREFIX, ZONE_ICON_PATHS
@@ -37,7 +37,7 @@ from .zone_icons import ICON_PREFIX, ZONE_ICON_PATHS
 _LOGGER = logging.getLogger(__name__)
 
 ICON_SET_URL = f"/{DOMAIN}/zone-icons.js"
-_REGISTERED_KEY = f"{DOMAIN}_icon_set_registered"
+_REGISTERED_KEY: HassKey[bool] = HassKey(f"{DOMAIN}_icon_set_registered")
 
 # Home Assistant resolves a custom icon by awaiting this function and
 # reading `path` off the result; returning undefined means "no such icon",
@@ -90,8 +90,7 @@ async def async_register(hass: HomeAssistant) -> None:
     Idempotent: two configured Healthbox units would otherwise register
     the same view and URL twice.
     """
-    data: dict[str, Any] = hass.data
-    if data.get(_REGISTERED_KEY):
+    if hass.data.get(_REGISTERED_KEY):
         return
 
     try:
@@ -104,4 +103,4 @@ async def async_register(hass: HomeAssistant) -> None:
         )
         return
 
-    data[_REGISTERED_KEY] = True
+    hass.data[_REGISTERED_KEY] = True

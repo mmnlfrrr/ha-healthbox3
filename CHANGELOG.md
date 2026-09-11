@@ -116,6 +116,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   original by 27% and 17% of the canvas. Their symbols fall back to a
   neighbouring icon (kitchen and bed), and anything outside the known
   vocabulary falls back to a generic house, as Renson's own picker does.
+- Per-state icons for the two `AQI level` sensors. They are five-band enum
+  sensors that had no entry in `icons.json` at all, so Home Assistant drew
+  the same generic icon for "Excellent" and for "Very bad". They now use
+  the same mechanism the profile select and boost fan already did: a
+  default matching their numeric twins, and a scale of faces across the
+  five bands.
 - `IP address`, `MAC address` and `Connection type` sensors (diagnostic),
   from the `/renson_core/v2/global` response that was previously read only
   for the firmware version. `Connection type` is the one that fills a real
@@ -192,6 +198,23 @@ All of the above read `/v1/device` and
 `/renson_core/v1/wifi/client/status`, neither of which was previously
 called. Like every other reverse-engineered endpoint here, both are gated
 on an active API key.
+
+### Fixed
+
+- **A correct API key was reported as rejected.** Activating a key is
+  asynchronous on the device's side - it has to reach Renson's servers to
+  check the key against its own serial, and answers `validating` until
+  that finishes. The config flow read the status once, immediately after
+  sending the key, landing squarely inside that window, saw something
+  other than `valid` and announced a rejected key. The same key then
+  worked.
+
+  All three places a key can be entered (setup, reconfigure, reauth) now
+  wait for the device to actually answer, and a device that never decides
+  gets its own message - it needs internet access - instead of the key
+  taking the blame. The same state at startup no longer triggers a reauth
+  prompt or a silent fall back to v1 either: a device revalidating its own
+  key, which is what it does after a reboot, is waited out.
 
 ## [0.3.3] - 2026-07-14
 
@@ -279,20 +302,6 @@ on an active API key.
 
 ### Fixed
 
-- **A correct API key could be reported as invalid.** Activating a key is
-  asynchronous on the device's side: it has to reach Renson's servers to
-  check the key against its own serial, and answers `validating` until that
-  finishes. The config flow read the status once, immediately after
-  submitting - catching exactly that window - and, seeing something other
-  than `valid`, told the user the key had been rejected. The same key then
-  worked. All three places a key can be entered (setup, reconfigure,
-  reauthentication) now wait for the device to actually decide, and a
-  device that never settles gets its own message (it needs internet access
-  to validate) instead of being blamed on the key.
-- Related: a device re-validating its key on its own - which it does after
-  a reboot - no longer trips a spurious reauthentication prompt at startup,
-  nor a silent downgrade to v1. Setup retries and the coordinator waits it
-  out instead.
 - **The per-room CO2 threshold number was reading and writing the wrong
   field.** It showed and set `minimum`, but confirmed against a fresh
   device capture cross-referenced with the Renson app, the app displays

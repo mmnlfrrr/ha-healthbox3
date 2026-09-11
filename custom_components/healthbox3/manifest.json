@@ -1,6 +1,10 @@
 {
   "domain": "healthbox3",
   "name": "Renson Healthbox 3",
+  "after_dependencies": [
+    "frontend",
+    "http"
+  ],
   "codeowners": [
     "@TrojanHorsePower"
   ],
@@ -9,10 +13,6 @@
     {
       "hostname": "healthbox3*"
     }
-  ],
-  "after_dependencies": [
-    "frontend",
-    "http"
   ],
   "documentation": "https://github.com/TrojanHorsePower/ha-healthbox3",
   "integration_type": "hub",

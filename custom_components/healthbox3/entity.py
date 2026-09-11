@@ -108,6 +108,17 @@ def _room_device(serial: str, room: RoomRef) -> DeviceInfo:
     which is what a Renson "room" physically is from the unit's side - one
     collector port with a motorised valve on it (`"type": "air valve"` in
     the device's own actuator list).
+
+    Known deprecation, deliberately not acted on yet: Home Assistant has
+    dropped `via_device` from the `DeviceInfo` TypedDict in favour of
+    `via_device_id`, so mypy flags the key below as unknown. The registry
+    still accepts it at runtime and only stops in 2027.8 (see
+    `_DEPRECATED_DEVICE_INFO_PARAMETERS` in core's device_registry).
+    Moving over is not a rename: `via_device_id` wants the unit's
+    *registry id*, which this function does not have and which only exists
+    once the unit's device entry does - so it needs a registry lookup here
+    and a way to fail visibly rather than silently un-nesting every room.
+    That is its own change, with its own tests.
     """
     return DeviceInfo(
         identifiers={(DOMAIN, f"{serial}_room{room.id}")},

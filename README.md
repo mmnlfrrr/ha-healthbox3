@@ -69,6 +69,10 @@ taking that on, please open a GitHub issue to discuss it.
 - Automatic, silent reconnection if your Healthbox 3's IP address changes
   (e.g. a DHCP lease renewal) after setup - no notification, no action
   needed.
+- A dashboard card drawing the unit and its outlets as Renson's own app
+  does, with each room's readings on hover - see
+  [Dashboard card](#dashboard-card). It comes with the integration; there
+  is no resource to register and nothing to configure.
 - Demand control, minimum ventilation level, Breeze's trigger temperature
   (temperature-triggered night cooling), per-room CO2 threshold, and
   silent schedule controls - all mirroring settings from Renson's own
@@ -210,6 +214,9 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `AQI level` | That same whole-house qualification band as its own state, for dashboards - created alongside `Air quality index` |
 | `sensor` | `Ventilation level` | Whole-house current ventilation level, as a percentage; not capped at 100% - requires an active API key |
 | `sensor` | `Firmware version` | The device's currently installed firmware version - diagnostic entity, requires an active API key |
+| `sensor` | `IP address` | The address the device reports for itself - diagnostic entity, requires an active API key |
+| `sensor` | `MAC address` | The device's hardware address - diagnostic entity, requires an active API key |
+| `sensor` | `Connection type` | Ethernet or Wi-Fi. Worth having beside `Wi-Fi status`, which answers "not connected" on a unit wired over Ethernet and reads like a fault until you know it is on a cable - diagnostic entity, requires an active API key |
 | `sensor` | `Device errors` | Count of currently-active device-reported errors, plus the most recent one's details as attributes - diagnostic entity, requires an active API key; each active error also creates a repair issue (**Settings > Repairs**) |
 | `sensor` | `Power` | Whole-device electrical power draw - requires an active API key |
 | `sensor` | `Energy` | Cumulative kWh, integrated from `Power` - feeds the Energy dashboard directly, requires an active API key; see [Energy dashboard](#energy-dashboard) |
@@ -226,6 +233,9 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `<room> Nominal airflow` | That room's rated reference airflow in m³/h - diagnostic entity |
 | `sensor` | `<room> Valve pressure` | Differential pressure across that room's valve, Pa - diagnostic entity, requires an active API key |
 | `sensor` | `<room> Duct conductance` | That room's duct conductance - diagnostic entity, requires an active API key; see [Duct model](#duct-model) |
+| `sensor` | `<room> Valve port` | Which collector port on the unit that room's valve is wired to - the number printed next to the port, and what the [dashboard card](#dashboard-card) places rooms by - diagnostic entity |
+| `sensor` | `<room> Legislation code` | The regulatory code the installer assigned to that outlet (C16, C22...). Which codes exist depends on the country, so the raw value is shown as-is - diagnostic entity |
+| `sensor` | `<room> Room symbol` | The pictogram Renson's own app uses for that room, drawn with Renson's own icon - diagnostic entity |
 | `sensor` | `Wi-Fi status` | The device's Wi-Fi client status, with SSID as an attribute - diagnostic entity, requires an active API key |
 | `binary_sensor` | `Problem` | On while the device reports any error - the boolean companion to `Device errors`, requires an active API key |
 | `binary_sensor` | `Advanced API access` | Whether privileged (v2) access is currently working - diagnostic entity, always created |
@@ -344,6 +354,43 @@ behavior, not a bug in this integration. Watch the `remaining` attribute
 after adjusting the slider mid-boost and you'll see it jump back up - that's
 expected. The integration logs an info-level message each time this happens
 ("Restarting active boost for room(s) ...").
+
+## Dashboard card
+
+The integration ships a Lovelace card that draws the unit and its outlets
+the way Renson's own app does: a numbered connection at each collector
+port that carries a room, a blanking cap everywhere else, and the unit
+centred. Hovering (or clicking, or tabbing to) an outlet opens a panel
+with that room's pictogram, name, Home Assistant area, regulatory code,
+airflow percentage beside the outlet number, air quality, profile and
+boost; clicking opens that room's more-info dialog.
+
+Add it from the card picker - **Edit dashboard** → **Add card** → search
+"Renson Healthbox". The integration serves the card itself, so there is
+no resource to register by hand, and nothing about it is per-install: it
+reads the real topology from the integration, so the same card works on
+any unit and in any language.
+
+**After installing or updating this integration, restart Home Assistant
+and then hard-refresh your browser before looking for the card.** The
+card and the room pictograms are registered with the frontend while the
+integration sets up, and the browser only picks the new module up on a
+fresh page load - so a card that is "missing" right after an update is
+almost always a cached page rather than a failed install.
+
+The only option is `serial`, and only if you have more than one Healthbox:
+
+```yaml
+type: custom:healthbox-card
+serial: 1234567890   # optional; defaults to the first unit configured
+```
+
+Outlets split into several branches are drawn with Renson's dotted
+numbering (`1.1`, `1.2`) as a chain running away from the unit, the way
+the Renson installer app draws them. An outlet is marked faulty only when
+a reported error's association id is exactly one of this unit's port
+numbers - `/v1/error` says nothing about what that id identifies, so
+anything else is shown against the unit rather than blamed on a room.
 
 ## Examples
 
