@@ -32,9 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entity is first created. The visible changes are the device grouping and
   the shorter names. Only a fresh install (or a removed-and-re-added
   integration) gets the shorter entity IDs.
-
-### Changed
-
 - Ventilation profile icons now match the ones Renson's own app uses: a
   plain heart for `health` (was a heart-with-pulse-line) and a tornado for
   `intense` (was the generic wind glyph). The wind glyph is also the
