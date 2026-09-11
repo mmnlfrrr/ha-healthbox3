@@ -212,7 +212,12 @@
     },
     "select": {
       "room_profile": {
-        "name": "Profiel"
+        "name": "Profiel",
+        "state": {
+          "eco": "Eco",
+          "health": "Gezondheid",
+          "intense": "Intens"
+        }
       }
     },
     "fan": {

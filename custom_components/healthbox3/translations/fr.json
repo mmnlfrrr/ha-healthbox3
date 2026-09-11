@@ -100,9 +100,9 @@
       "room_aqi_level": {
         "name": "Niveau IQA",
         "state": {
-          "very_good": "Très bon",
+          "very_good": "Excellent",
           "good": "Bon",
-          "moderate": "Modéré",
+          "moderate": "Moyen",
           "poor": "Mauvais",
           "very_poor": "Très mauvais"
         }
@@ -127,9 +127,9 @@
       "global_aqi_level": {
         "name": "Niveau IQA",
         "state": {
-          "very_good": "Très bon",
+          "very_good": "Excellent",
           "good": "Bon",
-          "moderate": "Modéré",
+          "moderate": "Moyen",
           "poor": "Mauvais",
           "very_poor": "Très mauvais"
         }
@@ -138,7 +138,7 @@
         "name": "Niveau de ventilation"
       },
       "firmware_version": {
-        "name": "Version du firmware"
+        "name": "Version du micrologiciel"
       },
       "ip_address": {
         "name": "Adresse IP"
@@ -159,7 +159,7 @@
         "name": "Puissance du ventilateur"
       },
       "fan_airflow": {
-        "name": "Débit du ventilateur"
+        "name": "Débit d'air total d'extraction"
       },
       "fan_speed": {
         "name": "Régime du ventilateur"
@@ -174,7 +174,7 @@
         "name": "Pression du ventilateur"
       },
       "exhaust_pressure": {
-        "name": "Pression de sortie"
+        "name": "Pression d'échappement"
       },
       "outlet_conductance": {
         "name": "Conductance de sortie"
@@ -212,7 +212,12 @@
     },
     "select": {
       "room_profile": {
-        "name": "Profil"
+        "name": "Profil",
+        "state": {
+          "eco": "Eco",
+          "health": "Santé",
+          "intense": "Intense"
+        }
       }
     },
     "fan": {

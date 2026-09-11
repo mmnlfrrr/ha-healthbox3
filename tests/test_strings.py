@@ -6,11 +6,12 @@ apart (a new key added to one but not the others), which nothing else
 in the test suite would catch.
 
 Translation status: Dutch (nl.json) has been reviewed by a native
-speaker. French (fr.json) has not - it's a best-effort translation
-only, produced without a native French speaker's review, and should be
-treated as less trustworthy than the English/Dutch text until someone
-fluent checks it. If you're a native French speaker, corrections are
-very welcome.
+speaker. French (fr.json) started as a best-effort translation and has
+since been checked against the wording of Renson's own French app,
+which is the closest thing to an authority there is for this vocabulary
+- the terms a user already reads on their phone. Corrections from a
+native speaker are still welcome; the parts with no counterpart in the
+app remain best-effort.
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+
+from custom_components.healthbox3.const import PROFILES
 
 _HEALTHBOX3_DIR = Path(__file__).parent.parent / "custom_components" / "healthbox3"
 STRINGS_PATH = _HEALTHBOX3_DIR / "strings.json"
@@ -71,3 +74,19 @@ def test_translations_fr_matches_en_key_structure():
     assert _key_shape(_load_json(TRANSLATIONS_FR_PATH)) == _key_shape(
         _load_json(TRANSLATIONS_EN_PATH)
     )
+
+
+def test_every_select_option_is_translated():
+    """A select whose options carry no translation shows the device's own
+    raw values - a French user reading "health" where the Renson app says
+    "Santé". Nothing else catches it: the entity works perfectly, it just
+    speaks the wrong language.
+
+    Derived from PROFILES rather than a literal, so a profile added in
+    code without a matching label fails here.
+    """
+    strings = _load_json(STRINGS_PATH)
+    options = strings["entity"]["select"]["room_profile"]["state"]
+
+    assert set(options) == set(PROFILES)
+    assert all(label and not label.islower() for label in options.values())

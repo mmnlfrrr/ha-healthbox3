@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default icon of three airflow/ventilation sensors, so `intense` used to
   be visually indistinguishable from them in a list. `eco` keeps its leaf,
   which already matched.
+- **Ventilation profile options are now translated.** The profile select
+  offered the device's own `eco`/`health`/`intense` with no labels, so they
+  showed raw - where Renson's own app says Eco/Health/Intense. Now
+  translated in all three languages, with a test deriving the expected set
+  from the code so a new profile cannot ship unlabelled.
+- Several French labels re-checked against the wording of Renson's French
+  app: firmware version, exhaust pressure, total extraction airflow, and the
+  air quality scale (`Excellent`/`Moyen` rather than `Très bon`/`Modéré`).
+  `Exhaust pressure` was also a mistranslation of this integration's own
+  English, independently of Renson.
 
 ### Added
 
