@@ -71,19 +71,19 @@
     },
     "sensor": {
       "room_temperature": {
-        "name": "{room_name} Temperature"
+        "name": "Temperature"
       },
       "room_humidity": {
-        "name": "{room_name} Humidity"
+        "name": "Humidity"
       },
       "room_co2": {
-        "name": "{room_name} CO2"
+        "name": "CO2"
       },
       "room_voc": {
-        "name": "{room_name} VOC"
+        "name": "VOC"
       },
       "room_aqi": {
-        "name": "{room_name} Air quality index",
+        "name": "Air quality index",
         "state_attributes": {
           "qualification": {
             "state": {
@@ -97,7 +97,7 @@
         }
       },
       "room_aqi_level": {
-        "name": "{room_name} AQI level",
+        "name": "AQI level",
         "state": {
           "very_good": "Very good",
           "good": "Good",
@@ -107,7 +107,7 @@
         }
       },
       "room_airflow": {
-        "name": "{room_name} Airflow"
+        "name": "Airflow"
       },
       "global_aqi": {
         "name": "Air quality index",
@@ -173,16 +173,16 @@
         "name": "Network leakage"
       },
       "room_airflow_rate": {
-        "name": "{room_name} Airflow rate"
+        "name": "Airflow rate"
       },
       "room_nominal_airflow": {
-        "name": "{room_name} Nominal airflow"
+        "name": "Nominal airflow"
       },
       "room_valve_pressure": {
-        "name": "{room_name} Valve pressure"
+        "name": "Valve pressure"
       },
       "room_conductance": {
-        "name": "{room_name} Duct conductance"
+        "name": "Duct conductance"
       },
       "wifi_status": {
         "name": "Wi-Fi status"
@@ -190,12 +190,12 @@
     },
     "select": {
       "room_profile": {
-        "name": "{room_name} Profile"
+        "name": "Profile"
       }
     },
     "fan": {
       "room_boost": {
-        "name": "{room_name} Boost"
+        "name": "Boost"
       },
       "boost_all": {
         "name": "Boost all"
@@ -217,7 +217,7 @@
         "name": "Breeze temperature"
       },
       "room_co2_threshold": {
-        "name": "{room_name} CO2 threshold"
+        "name": "CO2 threshold"
       },
       "silent_reduction": {
         "name": "Silent reduction"

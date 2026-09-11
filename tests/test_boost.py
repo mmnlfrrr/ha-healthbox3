@@ -24,8 +24,11 @@ from .conftest import setup_integration
 
 # The device name ("Healthbox 3.0" in both fixtures) becomes an entity_id
 # slug prefix once has_entity_name groups every entity under one device.
+# Slug de l'''appareil principal. Les entités de pièce n'''en dépendent plus :
+# chaque pièce est son propre appareil, donc leur identifiant commence
+# directement par le nom de la pièce (voir entity.py).
 _PREFIX = "healthbox_3_0"
-_ROOM1_ENTITY = f"fan.{_PREFIX}_toilet_boost"
+_ROOM1_ENTITY = "fan.toilet_boost"
 _ALL_ENTITY = f"fan.{_PREFIX}_boost_all"
 
 
@@ -379,7 +382,7 @@ async def test_boost_fan_guards_against_a_room_removed_from_the_device(
     coordinator.async_update_listeners()
     await hass.async_block_till_done()
 
-    entity_id = f"fan.{_PREFIX}_toilet_boost"
+    entity_id = "fan.toilet_boost"
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
             "fan", "turn_on", {"entity_id": entity_id}, blocking=True

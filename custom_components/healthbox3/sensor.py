@@ -43,7 +43,7 @@ from .const import (
     SENSOR_TYPE_VOC,
 )
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
-from .entity import Healthbox3Entity
+from .entity import Healthbox3Entity, RoomRef
 
 # Entities only read from the coordinator; the coordinator itself
 # serializes the actual device polling, so there's nothing for per-entity
@@ -354,12 +354,13 @@ class Healthbox3RoomSensor(Healthbox3Entity, SensorEntity):
         meta: RoomSensorMeta,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, serial)
+        super().__init__(
+            coordinator, serial, room=RoomRef(id=room_id, name=room_name)
+        )
         self._room_id = room_id
         self._sensor_type = sensor_type
         self._meta = meta
         self._attr_translation_key = meta.translation_key
-        self._attr_translation_placeholders = {"room_name": room_name}
         self._attr_device_class = meta.device_class
         self._attr_native_unit_of_measurement = meta.native_unit_of_measurement
         self._attr_suggested_display_precision = meta.suggested_display_precision
@@ -447,9 +448,10 @@ class Healthbox3RoomAqiLevelSensor(Healthbox3Entity, SensorEntity):
         room_name: str,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, serial)
+        super().__init__(
+            coordinator, serial, room=RoomRef(id=room_id, name=room_name)
+        )
         self._room_id = room_id
-        self._attr_translation_placeholders = {"room_name": room_name}
         self._attr_unique_id = f"{serial}_room{room_id}_aqi_level"
 
     def _find_sensor(self) -> Sensor | None:
@@ -501,9 +503,10 @@ class Healthbox3RoomAirflowSensor(Healthbox3Entity, SensorEntity):
         room_name: str,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, serial)
+        super().__init__(
+            coordinator, serial, room=RoomRef(id=room_id, name=room_name)
+        )
         self._room_id = room_id
-        self._attr_translation_placeholders = {"room_name": room_name}
         self._attr_unique_id = f"{serial}_room{room_id}_airflow"
 
     def _find_room(self) -> Room | None:
@@ -824,9 +827,10 @@ class _Healthbox3RoomValueSensor(Healthbox3Entity, SensorEntity):
         room_name: str,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, serial)
+        super().__init__(
+            coordinator, serial, room=RoomRef(id=room_id, name=room_name)
+        )
         self._room_id = room_id
-        self._attr_translation_placeholders = {"room_name": room_name}
         self._attr_unique_id = f"{serial}_room{room_id}_{self._unique_id_suffix}"
 
     def _find_room(self) -> Room | None:

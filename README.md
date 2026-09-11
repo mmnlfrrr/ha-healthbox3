@@ -241,10 +241,27 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `time` | `Silent start time` | Time of day the silent schedule starts, applied to every day of the week - requires an active API key, see [Known limitations](#known-limitations) |
 | `time` | `Silent stop time` | Time of day the silent schedule stops, applied to every day of the week - requires an active API key, see [Known limitations](#known-limitations) |
 
-All entities for a given Healthbox unit are grouped under a single device
-(named after the device's own description, e.g. "Healthbox 3.0" - rename it
-in the UI if you'd like something more specific, like "Basement
-Healthbox").
+### Devices and areas
+
+A Healthbox is registered as **one device for the unit, plus one device per
+ventilated room**, each linked back to the unit.
+
+Anything describing the appliance as a whole stays on the unit device: the
+whole-house air quality, ventilation level, power and fan readings, `Boost
+all`, demand control, Silent and every diagnostic. Everything measured in
+or applied to a single room lives on that room's device.
+
+That split exists so **areas work**. Home Assistant assigns areas per
+device, so with a single device the only way to get the kitchen's sensors
+into the Kitchen area is to move them one by one - which also leaves their
+entity IDs carrying whatever prefix they had at the time. One device per
+room means one assignment per room, and every sensor in it follows.
+
+It also keeps names short: a room sensor is just `Temperature`, since the
+device already says which room. Rename the unit device in the UI if you'd
+like something more specific than its reported description (e.g. "Basement
+Healthbox"); room devices take the room names configured on the Healthbox
+itself.
 
 ### Energy dashboard
 

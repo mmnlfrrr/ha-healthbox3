@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Each ventilated room is now its own device**, linked back to the unit
+  via `via_device`, instead of every entity sitting on one device. The unit
+  device keeps everything describing the appliance as a whole (air quality,
+  ventilation level, power, fan readings, `Boost all`, demand control,
+  Silent, diagnostics); room-scoped entities move to their room's device.
+
+  The reason is areas. Home Assistant assigns areas per device, so with a
+  single device the only way to get one room's sensors into that room's
+  area was to move them one at a time - and entity IDs generated before
+  such a move keep whatever prefix they were given, which is how an
+  install ends up with IDs like
+  `sensor.bathroom_healthbox_kitchen_duct_conductance`. One device per room
+  makes it one assignment per room, with every sensor following.
+
+  Room entity names lose their room prefix as a result (`Toilet
+  Temperature` becomes `Temperature` under a `Toilet` device): the device
+  already says which room, so repeating it was redundant.
+
+  **Existing installs keep their entity IDs and history** - unique IDs are
+  unchanged, and Home Assistant only derives an entity ID once, when the
+  entity is first created. The visible changes are the device grouping and
+  the shorter names. Only a fresh install (or a removed-and-re-added
+  integration) gets the shorter entity IDs.
+
 ### Added
 
 - Electrical power sensors (`Power` for the whole device, `Fan power` for
