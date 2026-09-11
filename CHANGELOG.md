@@ -41,6 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A Healthbox card**, drawing the unit and its outlets the way the
+  Renson app does: a numbered connection at each wired collector port, a
+  cap everywhere else, and each room's name, airflow and pictogram beside
+  it. Add it from the card picker - the integration serves it, so there is
+  no resource to register by hand.
+
+  Nothing about it is per-install: the integration publishes the real
+  topology (which ports carry a room, their names, their entity ids) at
+  `/api/healthbox3/layout`, so the same card works on any unit and in any
+  language. The artwork and the 540x540 stage geometry come from the app's
+  own drawables and decoded layout, not from a redrawing.
 - **Each room is now illustrated with Renson's own pictogram.** The
   `Room symbol` sensor carries the drawing Renson's app uses for that
   room - bathtub, chef's hat, toilet, bed - with no per-install setup. The
