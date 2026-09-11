@@ -452,6 +452,56 @@ def test_card_module_sizes_its_own_viewport():
     assert "const dy = Math.max(top, bottom) + margin" in module
 
 
+async def test_layout_offers_the_units_own_readings(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The card puts the whole-house ventilation level in its header, so
+    the unit needs entity ids of its own - the rooms' are not enough.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    entities = build_layout(hass)["units"][0]["entities"]
+
+    assert entities["ventilation_level"].startswith("sensor.")
+    assert entities["airflow"].startswith("sensor.")
+
+
+async def test_unit_readings_are_absent_without_an_api_key(
+    hass, mock_api_client, v1_data, boost_status
+):
+    """Both readings are gated on privileged access, so a v1-only unit
+    simply has neither - and the header falls back to the plain name.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+        boost_status=boost_status,
+    )
+
+    assert build_layout(hass)["units"][0]["entities"] == {}
+
+
+def test_card_header_carries_the_ventilation_level():
+    """Appended to the name rather than replacing it, and dropped whole
+    when the reading is missing or not a number - a header reading
+    "Healthbox 3.0 · NaN%" would be worse than no figure.
+    """
+    module = build_card_module()
+
+    assert "_header(unit)" in module
+    assert "Number.isFinite(value)" in module
+    assert "return unit.name;" in module
+
+
 def test_layout_is_empty_before_any_unit_is_set_up(hass):
     """The view answers on a bare install too, rather than raising."""
     assert build_layout(hass) == {"units": []}

@@ -58,6 +58,23 @@ _ROOM_ENTITIES: dict[str, tuple[str, str]] = {
 }
 
 
+# The unit's own readings the card shows, same lookup as the room ones.
+_UNIT_ENTITIES: dict[str, tuple[str, str]] = {
+    "ventilation_level": ("sensor", "global_ventilation_level"),
+    "airflow": ("sensor", "fan_airflow"),
+}
+
+
+def _unit_entities(registry: er.EntityRegistry, serial: str) -> dict[str, str]:
+    """Resolve the unit's entity ids, skipping any it doesn't have."""
+    found: dict[str, str] = {}
+    for key, (platform, suffix) in _UNIT_ENTITIES.items():
+        entity_id = registry.async_get_entity_id(platform, DOMAIN, f"{serial}_{suffix}")
+        if entity_id is not None:
+            found[key] = entity_id
+    return found
+
+
 def _room_entities(
     registry: er.EntityRegistry, serial: str, room_id: int
 ) -> dict[str, str]:
@@ -204,6 +221,7 @@ def build_layout(hass: HomeAssistant) -> dict[str, Any]:
             {
                 "serial": serial,
                 "name": healthbox.description,
+                "entities": _unit_entities(registry, serial),
                 # Sorted by port, then by room id, so a split outlet's
                 # branches are numbered in a stable order rather than
                 # shuffling between refreshes.
@@ -432,13 +450,25 @@ class HealthboxCard extends HTMLElement {
       : "";
 
     this.innerHTML =
-      `<ha-card header="${unit.name}">` +
+      `<ha-card header="${this._header(unit)}">` +
       `<div class="hb3" style="position:relative;padding:8px 8px 16px;` +
       `color:var(--primary-text-color)">` +
       `<svg viewBox="${view.join(" ")}" style="width:100%%;height:auto;display:block">` +
       `${parts.join("")}</svg>${warn}${this._tipElement()}</div></ha-card>`;
 
     this._bind(unit);
+  }
+
+  _header(unit) {
+    // The whole-house ventilation level, which is what the unit is doing
+    // as a single figure. Appended rather than replacing the name, and
+    // dropped entirely when the reading is missing - a header reading
+    // "Healthbox 3.0 · NaN%%" would be worse than no figure at all.
+    const level = this._state((unit.entities || {}).ventilation_level);
+    if (!level) return unit.name;
+    const value = Number(level.state);
+    if (!Number.isFinite(value)) return unit.name;
+    return `${unit.name} · ${Math.round(value)}%%`;
   }
 
   _tipElement() {
