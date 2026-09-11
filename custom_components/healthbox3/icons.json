@@ -27,11 +27,31 @@
       "room_aqi": {
         "default": "mdi:air-filter"
       },
+      "room_aqi_level": {
+        "default": "mdi:air-filter",
+        "state": {
+          "very_good": "mdi:emoticon-excited-outline",
+          "good": "mdi:emoticon-happy-outline",
+          "moderate": "mdi:emoticon-neutral-outline",
+          "poor": "mdi:emoticon-sad-outline",
+          "very_poor": "mdi:emoticon-cry-outline"
+        }
+      },
       "room_airflow": {
         "default": "mdi:weather-windy"
       },
       "global_aqi": {
         "default": "mdi:air-filter"
+      },
+      "global_aqi_level": {
+        "default": "mdi:air-filter",
+        "state": {
+          "very_good": "mdi:emoticon-excited-outline",
+          "good": "mdi:emoticon-happy-outline",
+          "moderate": "mdi:emoticon-neutral-outline",
+          "poor": "mdi:emoticon-sad-outline",
+          "very_poor": "mdi:emoticon-cry-outline"
+        }
       },
       "global_ventilation_level": {
         "default": "mdi:weather-windy"

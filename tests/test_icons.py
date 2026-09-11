@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from custom_components.healthbox3.api import AQI_QUALIFICATION_LEVELS
 from custom_components.healthbox3.const import PROFILES
 from custom_components.healthbox3.sensor import DEVICE_SENSOR_META, ROOM_SENSOR_META
 
@@ -31,6 +32,12 @@ EXTRA_SENSOR_KEYS = {
     "room_valve_pressure",
     "room_conductance",
     "global_aqi",
+    # The two enum (qualification band) sensors. They were missing from
+    # both this set and icons.json until now, which is exactly the drift
+    # this module claims to catch - it didn't, because the expected set is
+    # hand-maintained and an omission on both sides still compares equal.
+    "room_aqi_level",
+    "global_aqi_level",
     "global_ventilation_level",
     "firmware_version",
     "device_errors",
@@ -124,6 +131,19 @@ def test_room_profile_has_an_icon_for_every_profile_value():
     """
     profile_states = set(_load_icons()["entity"]["select"]["room_profile"]["state"])
     assert profile_states == set(PROFILES)
+
+
+def test_aqi_level_sensors_have_an_icon_for_every_band():
+    """Same reasoning as the profile test above, for the two enum sensors.
+
+    Derived from AQI_QUALIFICATION_LEVELS rather than a literal list, so a
+    band added or renamed in api.py fails here instead of silently
+    rendering the generic default for that one state.
+    """
+    icons = _load_icons()["entity"]["sensor"]
+    for translation_key in ("room_aqi_level", "global_aqi_level"):
+        states = set(icons[translation_key]["state"])
+        assert states == set(AQI_QUALIFICATION_LEVELS), translation_key
 
 
 def test_boost_fans_have_a_distinct_off_icon():
