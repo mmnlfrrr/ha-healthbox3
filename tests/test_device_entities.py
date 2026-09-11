@@ -293,6 +293,58 @@ async def test_room_symbol_prefers_the_device_icon_over_the_room_type(
     assert _state(hass, "sensor", v2_data.serial, "room5_symbol").state == "BedRoom"
 
 
+async def test_room_symbol_sensor_carries_rensons_pictogram(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The whole point of the symbol sensor: each room draws its own
+    Renson pictogram, with no per-install configuration.
+
+    Room 3's icon is "StudioFlat", which has no shippable drawing (see
+    zone_icons.py) and is substituted; room 4 is a LivingRoom, which maps
+    straight through.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    assert (
+        _state(hass, "sensor", v2_data.serial, "room4_symbol").attributes["icon"]
+        == "custom:renson-living"
+    )
+    assert (
+        _state(hass, "sensor", v2_data.serial, "room3_symbol").attributes["icon"]
+        == "custom:renson-bed"
+    )
+
+
+async def test_room_symbol_sensor_falls_back_for_an_unknown_symbol(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """A value outside the vocabulary draws the generic house rather than
+    being approximated onto the nearest room type.
+    """
+    odd = copy.deepcopy(v2_data)
+    next(r for r in odd.rooms if r.id == 1).parameters["icon"] = api_mod.Parameter(
+        value="WineCellar"
+    )
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=odd.serial,
+        healthbox_data=odd,
+        boost_status=boost_status,
+    )
+
+    state = _state(hass, "sensor", odd.serial, "room1_symbol")
+    assert state.state == "WineCellar"
+    assert state.attributes["icon"] == "custom:renson-house"
+
+
 async def test_legislation_code_sensor_created_only_for_rooms_that_report_one(
     hass, mock_api_client, v2_data, boost_status
 ):

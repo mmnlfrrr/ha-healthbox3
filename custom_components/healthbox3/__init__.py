@@ -9,6 +9,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import Healthbox3ApiClient, Healthbox3ConnectionError, Healthbox3Error
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
+from .icon_set import async_register as async_register_icon_set
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
@@ -54,6 +55,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -
     if entry.data.get(CONF_API_KEY) and not status.is_valid:
         # The user told us they had a working key; the device now disagrees.
         raise ConfigEntryAuthFailed("Healthbox 3 API key is no longer valid")
+
+    # Cosmetic and best-effort, so it runs before anything that can fail
+    # and never gates setup - see icon_set.py.
+    await async_register_icon_set(hass)
 
     coordinator = Healthbox3DataUpdateCoordinator(
         hass, entry, client, use_v2=use_v2

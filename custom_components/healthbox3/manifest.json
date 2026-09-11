@@ -1,9 +1,19 @@
 {
   "domain": "healthbox3",
   "name": "Renson Healthbox 3",
-  "codeowners": ["@TrojanHorsePower"],
+  "codeowners": [
+    "@TrojanHorsePower"
+  ],
   "config_flow": true,
-  "dhcp": [{ "hostname": "healthbox3*" }],
+  "dhcp": [
+    {
+      "hostname": "healthbox3*"
+    }
+  ],
+  "after_dependencies": [
+    "frontend",
+    "http"
+  ],
   "documentation": "https://github.com/TrojanHorsePower/ha-healthbox3",
   "integration_type": "hub",
   "iot_class": "local_polling",

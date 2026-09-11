@@ -41,6 +41,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Each room is now illustrated with Renson's own pictogram.** The
+  `Room symbol` sensor carries the drawing Renson's app uses for that
+  room - bathtub, chef's hat, toilet, bed - with no per-install setup. The
+  icons ship as a `custom:renson-*` icon set the integration serves to the
+  frontend.
+
+  21 of Renson's 23 zone pictograms are shipped as-is. Two cannot be:
+  `cooker_hood` is line art, which Home Assistant's icon renderer would
+  fill into a blob, and `studio` is two paths under different fill rules
+  that cannot be combined into the single path the renderer takes. Both
+  were rasterised and compared rather than assumed; they differ from the
+  original by 27% and 17% of the canvas. Their symbols fall back to a
+  neighbouring icon (kitchen and bed), and anything outside the known
+  vocabulary falls back to a generic house, as Renson's own picker does.
 - `IP address`, `MAC address` and `Connection type` sensors (diagnostic),
   from the `/renson_core/v2/global` response that was previously read only
   for the firmware version. `Connection type` is the one that fills a real

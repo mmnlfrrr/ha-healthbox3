@@ -51,6 +51,7 @@ from .const import (
 )
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
 from .entity import Healthbox3Entity, RoomRef
+from .zone_icons import FALLBACK_ICON, ICON_PREFIX, ROOM_SYMBOL_TO_ICON
 
 # Entities only read from the coordinator; the coordinator itself
 # serializes the actual device polling, so there's nothing for per-entity
@@ -1027,6 +1028,24 @@ class Healthbox3RoomSymbolSensor(Healthbox3Entity, SensorEntity):
         )
         self._room_id = room_id
         self._attr_unique_id = f"{serial}_room{room_id}_symbol"
+
+    @property
+    @override
+    def icon(self) -> str | None:
+        """Return Renson's own pictogram for this room.
+
+        Set here rather than in icons.json because the icon depends on the
+        entity's state, and icon translations only take a fixed set of
+        states - the symbol vocabulary is open-ended. Falls back to the
+        generic house for anything unrecognised, which is what Renson's
+        own picker does too.
+        """
+        symbol = self.native_value
+        if symbol is None:
+            # Nothing to draw; let icons.json's generic default apply.
+            return None
+        name = ROOM_SYMBOL_TO_ICON.get(symbol, FALLBACK_ICON)
+        return f"custom:{ICON_PREFIX}-{name}"
 
     @property
     @override
