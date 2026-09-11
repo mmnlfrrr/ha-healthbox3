@@ -58,6 +58,19 @@
       "unique_id_mismatch": "Dit IP-adres behoort tot een andere Healthbox 3 dan degene die wordt geherconfigureerd."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Healthbox 3-opties",
+        "data": {
+          "scan_interval": "Pollinginterval"
+        },
+        "data_description": {
+          "scan_interval": "Hoe vaak het apparaat wordt uitgelezen, in seconden. Elke polling doet één verzoek per endpoint plus één per ruimte, dus een korter interval betekent merkbaar meer verkeer naar de unit."
+        }
+      }
+    }
+  },
   "entity": {
     "binary_sensor": {
       "device_problem": {

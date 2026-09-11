@@ -31,6 +31,7 @@ from .const import (
     DISCOVERY_MESSAGE,
     DISCOVERY_PORT,
     DISCOVERY_TIMEOUT,
+    MAX_CONCURRENT_REQUESTS,
     PROFILES,
     ROOM_PARAM_ICON,
     ROOM_PARAM_LEGISLATION_CODE,
@@ -607,6 +608,23 @@ def room_legislation_code(room: Room) -> str | None:
     return parameter.value.strip() or None
 
 
+def as_float(value: bool | float | str | None) -> float | None:
+    """Narrow a Parameter's value to a float, or None if it isn't one.
+
+    Parameter.value is a bool/float/str/None union covering every
+    parameter type across the whole API - real hardware has only ever
+    sent a float for nominal/flow_rate specifically, but nothing in the
+    schema actually guarantees that. A graceful "treat it as not
+    reporting" fallback here, not a silent cast, matches how an empty/
+    unexpected CO2 reading is already treated as unavailable rather than
+    crashing - this project has been burned by "trust the device"
+    assumptions before (the profile index's cross-firmware convention
+    change, boost's restart-not-adjust behavior), so a real, if currently
+    theoretical, type mismatch here is worth handling the same way.
+    """
+    return value if isinstance(value, float) else None
+
+
 def room_valve_port(room: Room) -> int | None:
     """Return the collector port a room's valve is wired to, if reported.
 
@@ -960,6 +978,7 @@ class Healthbox3ApiClient:
         self._host = host
         self._session = session
         self._base_url = f"http://{host}"
+        self._in_flight = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
     async def _request(
         self,
@@ -969,7 +988,7 @@ class Healthbox3ApiClient:
     ) -> Any:
         url = f"{self._base_url}{path}"
         try:
-            async with self._session.request(
+            async with self._in_flight, self._session.request(
                 method, url, timeout=_REQUEST_TIMEOUT, **kwargs
             ) as resp:
                 if resp.status in (401, 403):

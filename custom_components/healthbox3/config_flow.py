@@ -9,9 +9,20 @@ from typing import Any, override
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_API_KEY, CONF_HOST
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_SCAN_INTERVAL
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .api import (
@@ -25,7 +36,11 @@ from .const import (
     API_KEY_ACTIVATION_ATTEMPTS,
     API_KEY_ACTIVATION_POLL_SECONDS,
     DOMAIN,
+    SCAN_INTERVAL_MAX,
+    SCAN_INTERVAL_MIN,
+    SCAN_INTERVAL_STEP,
 )
+from .coordinator import scan_interval
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,10 +84,59 @@ async def _async_activate_api_key(
     return {"base": "invalid_api_key"}
 
 
+class Healthbox3OptionsFlow(OptionsFlow):
+    """Settings that belong to this installation rather than to the device.
+
+    Only the poll interval, for now. It is an option rather than a field on
+    the config entry itself because changing it is not re-configuring which
+    device this is - it does not need re-validating against the hardware,
+    and it should not sit alongside the host and API key where a typo costs
+    the connection.
+    """
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show and store the poll interval."""
+        if user_input is not None:
+            return self.async_create_entry(
+                data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL])}
+            )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_SCAN_INTERVAL,
+                        default=int(
+                            scan_interval(self.config_entry).total_seconds()
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=SCAN_INTERVAL_MIN,
+                            max=SCAN_INTERVAL_MAX,
+                            step=SCAN_INTERVAL_STEP,
+                            unit_of_measurement="s",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
+                }
+            ),
+        )
+
+
 class Healthbox3ConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Renson Healthbox 3."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    @override
+    def async_get_options_flow(config_entry: ConfigEntry) -> Healthbox3OptionsFlow:
+        """Return the options flow for this entry."""
+        return Healthbox3OptionsFlow()
 
     def __init__(self) -> None:
         """Initialize the config flow."""

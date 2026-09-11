@@ -80,8 +80,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -
     ).id
 
     entry.runtime_data = coordinator
+    # The poll interval is read once, when the coordinator is built, so a
+    # change to it only takes effect on a reload - which this listener is
+    # what triggers.
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def _async_reload_entry(
+    hass: HomeAssistant, entry: Healthbox3ConfigEntry
+) -> None:
+    """Reload the entry after its options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -> bool:

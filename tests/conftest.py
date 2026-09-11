@@ -257,11 +257,18 @@ def mock_api_client():
         yield client
 
 
-def make_config_entry(hass, *, serial: str, api_key: str | None = "goodkey") -> MockConfigEntry:
+def make_config_entry(
+    hass,
+    *,
+    serial: str,
+    api_key: str | None = "goodkey",
+    options: dict | None = None,
+) -> MockConfigEntry:
     """Create and register a Healthbox3 config entry."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_HOST: "192.0.2.1", CONF_API_KEY: api_key},
+        options=options or {},
         unique_id=serial,
     )
     entry.add_to_hass(hass)

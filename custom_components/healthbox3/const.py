@@ -4,7 +4,33 @@ from datetime import timedelta
 
 DOMAIN = "healthbox3"
 
+# Airflow is reported to the tenth of a m3/h but is nowhere near that
+# stable; a whole number is what the Renson app shows too.
+AIRFLOW_DISPLAY_PRECISION = 0
+
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
+
+# The poll interval is configurable per config entry (Settings > Devices &
+# Services > Configure). Bounds rather than a free-for-all: one poll is a
+# handful of requests to a small embedded unit, so anything under 15s stops
+# being polling and starts being load, while beyond 10 minutes the entities
+# stop being a live picture of the house.
+SCAN_INTERVAL_MIN = 15
+SCAN_INTERVAL_MAX = 600
+SCAN_INTERVAL_STEP = 5
+
+# How many requests this client will have in flight against one device at
+# once. The Healthbox is a small embedded unit behind nginx, and a poll
+# fans out to one request per endpoint plus one per room - enough, on a
+# seven-room installation, to be worth queueing rather than dumping on it
+# all at once. Four keeps the round-trips overlapping without that.
+MAX_CONCURRENT_REQUESTS = 4
+
+# `/renson_core/v2/global` carries firmware version, MAC, IP and serial -
+# things that change on a firmware update or a network move, not between
+# two polls. Re-read every Nth poll instead of every one; at the default
+# 30s interval that is once every ten minutes.
+GLOBAL_INFO_REFRESH_EVERY = 20
 
 # Discovery (UDP broadcast/unicast on port 49152), documented in the
 # 3rd-party API PDF. Used by the config flow's automatic broadcast

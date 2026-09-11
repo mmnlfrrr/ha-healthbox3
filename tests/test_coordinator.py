@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import SOURCE_REAUTH
+from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.helpers import issue_registry as ir
 
 from custom_components.healthbox3 import api as api_mod
-from custom_components.healthbox3.const import DOMAIN
-from custom_components.healthbox3.coordinator import Healthbox3DataUpdateCoordinator
+from custom_components.healthbox3.const import (
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    GLOBAL_INFO_REFRESH_EVERY,
+    SCAN_INTERVAL_MAX,
+    SCAN_INTERVAL_MIN,
+)
+from custom_components.healthbox3.coordinator import (
+    Healthbox3DataUpdateCoordinator,
+    scan_interval,
+)
 
 from .conftest import make_config_entry
 
@@ -637,3 +648,135 @@ async def test_invalid_response_disambiguated_via_key_status(hass, v2_data):
 
     assert coordinator.use_v2 is True  # not downgraded - key is still valid
     assert coordinator.last_update_success is False
+
+
+def _wire_full_poll(client, *, v2_data, boost_status):
+    """Configure a client so one refresh exercises every endpoint for real.
+
+    The shared fixture defaults several calls to "not reported" so older
+    tests aren't affected by them; the polling tests below are about how
+    many calls a poll makes, so they need every one of them to answer.
+    """
+    client.async_get_v2_data_current = AsyncMock(return_value=v2_data)
+    client.async_get_boost = AsyncMock(return_value=boost_status)
+    client.async_get_global = AsyncMock(
+        return_value=api_mod.GlobalInfo(firmware_version="2.6.9")
+    )
+    return client
+
+
+async def test_one_poll_reads_every_endpoint_at_most_once(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The fan-out is parallel now, not sequential - which is only safe if
+    nothing is accidentally asked twice per cycle.
+
+    Counted rather than asserted per-call: the point is the shape of a
+    poll (one read each, plus one boost per room), and a regression here
+    would be an endpoint quietly moving inside a loop.
+    """
+    _wire_full_poll(mock_api_client, v2_data=v2_data, boost_status=boost_status)
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    coordinator = Healthbox3DataUpdateCoordinator(
+        hass, entry, mock_api_client, use_v2=True
+    )
+    await coordinator.async_refresh()
+
+    assert mock_api_client.async_get_v2_data_current.call_count == 1
+    for single in (
+        mock_api_client.async_get_decision,
+        mock_api_client.async_get_breeze,
+        mock_api_client.async_get_room_decisions,
+        mock_api_client.async_get_global,
+        mock_api_client.async_get_errors,
+        mock_api_client.async_get_device,
+        mock_api_client.async_get_wifi_status,
+    ):
+        assert single.call_count == 1, single
+    assert mock_api_client.async_get_boost.call_count == len(v2_data.rooms)
+
+
+async def test_global_info_is_not_re_read_on_every_poll(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """Firmware version, MAC, IP and serial do not change between polls.
+
+    Re-reading them every 30 seconds was a request per poll for an answer
+    that is the same for months. A good read is reused for
+    GLOBAL_INFO_REFRESH_EVERY polls - and, just as importantly, still
+    *reported* on those polls rather than going missing.
+    """
+    _wire_full_poll(mock_api_client, v2_data=v2_data, boost_status=boost_status)
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    coordinator = Healthbox3DataUpdateCoordinator(
+        hass, entry, mock_api_client, use_v2=True
+    )
+
+    for _ in range(GLOBAL_INFO_REFRESH_EVERY):
+        await coordinator.async_refresh()
+        assert coordinator.data.global_info is not None
+
+    assert mock_api_client.async_get_global.call_count == 1
+
+    # The next poll is the one that asks again.
+    await coordinator.async_refresh()
+    assert mock_api_client.async_get_global.call_count == 2
+
+
+async def test_a_failed_global_read_is_not_cached(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """Only successful reads are reused.
+
+    A failure still drops to None - the entities built on it go
+    unavailable, exactly as before - and the next poll asks again rather
+    than serving a stale reading for ten minutes.
+    """
+    mock_api_client.async_get_global = AsyncMock(
+        side_effect=api_mod.Healthbox3Error("boom")
+    )
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    coordinator = Healthbox3DataUpdateCoordinator(
+        hass, entry, mock_api_client, use_v2=True
+    )
+
+    await coordinator.async_refresh()
+    assert coordinator.data.global_info is None
+    await coordinator.async_refresh()
+    assert coordinator.data.global_info is None
+    assert mock_api_client.async_get_global.call_count == 2
+
+
+async def test_scan_interval_comes_from_the_entry_options(
+    hass, mock_api_client, v2_data
+):
+    """The interval is configurable, and read from the entry rather than
+    fixed at construction."""
+    entry = make_config_entry(
+        hass, serial=v2_data.serial, options={CONF_SCAN_INTERVAL: 120}
+    )
+    coordinator = Healthbox3DataUpdateCoordinator(
+        hass, entry, mock_api_client, use_v2=True
+    )
+    assert coordinator.update_interval == timedelta(seconds=120)
+
+
+async def test_an_out_of_range_interval_is_clamped_not_rejected(hass, v2_data):
+    """The only way to get one is an entry written by hand or by an older
+    version; refusing to set up over it would be worse than bringing it
+    back in bounds.
+    """
+    too_fast = make_config_entry(
+        hass, serial=v2_data.serial, options={CONF_SCAN_INTERVAL: 1}
+    )
+    too_slow = make_config_entry(
+        hass, serial=f"{v2_data.serial}-2", options={CONF_SCAN_INTERVAL: 99999}
+    )
+    assert scan_interval(too_fast) == timedelta(seconds=SCAN_INTERVAL_MIN)
+    assert scan_interval(too_slow) == timedelta(seconds=SCAN_INTERVAL_MAX)
+
+
+async def test_no_options_means_the_default_interval(hass, v2_data):
+    """An entry from before the option existed keeps the interval it had."""
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    assert scan_interval(entry) == DEFAULT_SCAN_INTERVAL

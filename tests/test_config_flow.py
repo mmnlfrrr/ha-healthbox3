@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import replace
+from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import (
@@ -13,14 +14,14 @@ from homeassistant.config_entries import (
     SOURCE_RECONFIGURE,
     SOURCE_USER,
 )
-from homeassistant.const import CONF_API_KEY, CONF_HOST
+from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from custom_components.healthbox3 import api as api_mod
 from custom_components.healthbox3.const import API_KEY_ACTIVATION_ATTEMPTS, DOMAIN
 
-from .conftest import make_config_entry
+from .conftest import make_config_entry, setup_integration
 
 
 @contextmanager
@@ -1084,3 +1085,30 @@ async def test_reconfigure_flow_waits_out_validating(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_API_KEY] == "newkey"
+
+
+async def test_options_flow_sets_the_poll_interval(hass, mock_api_client, v2_data, boost_status):
+    """The interval is editable from Configure, and the entry reloads so the
+    new one takes effect without the user removing and re-adding the device.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_SCAN_INTERVAL: 90}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    # Stored as a plain int: the selector hands back a float.
+    assert entry.options == {CONF_SCAN_INTERVAL: 90}
+    assert entry.runtime_data.update_interval == timedelta(seconds=90)

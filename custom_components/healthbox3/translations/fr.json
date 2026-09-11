@@ -58,6 +58,19 @@
       "unique_id_mismatch": "Cette adresse IP appartient à une Healthbox 3 différente de celle en cours de reconfiguration."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options de la Healthbox 3",
+        "data": {
+          "scan_interval": "Intervalle d'interrogation"
+        },
+        "data_description": {
+          "scan_interval": "À quelle fréquence lire l'appareil, en secondes. Chaque relevé fait une requête par endpoint plus une par pièce : un intervalle court se paie en trafic vers l'unité."
+        }
+      }
+    }
+  },
   "entity": {
     "binary_sensor": {
       "device_problem": {

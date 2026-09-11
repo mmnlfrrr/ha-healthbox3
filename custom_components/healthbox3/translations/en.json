@@ -58,6 +58,19 @@
       "unique_id_mismatch": "This IP address belongs to a different Healthbox 3 device than the one being reconfigured."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Healthbox 3 options",
+        "data": {
+          "scan_interval": "Polling interval"
+        },
+        "data_description": {
+          "scan_interval": "How often to read the device, in seconds. Each poll is one request per endpoint plus one per room, so a shorter interval means noticeably more traffic to the unit."
+        }
+      }
+    }
+  },
   "entity": {
     "binary_sensor": {
       "device_problem": {

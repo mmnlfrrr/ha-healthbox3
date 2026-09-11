@@ -9,7 +9,7 @@ import logging
 from typing import override
 
 from homeassistant.config_entries import SOURCE_INTEGRATION_DISCOVERY, ConfigEntry
-from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import discovery_flow, issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -39,6 +39,9 @@ from .const import (
     BOOST_LEVEL_MIN,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    GLOBAL_INFO_REFRESH_EVERY,
+    SCAN_INTERVAL_MAX,
+    SCAN_INTERVAL_MIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -111,6 +114,23 @@ def _clamp_timeout(timeout: int | None) -> int:
 type Healthbox3ConfigEntry = ConfigEntry["Healthbox3DataUpdateCoordinator"]
 
 
+def scan_interval(entry: ConfigEntry) -> timedelta:
+    """Return the poll interval this entry is configured for.
+
+    Read from the entry's options rather than stored once at construction,
+    so changing it in the UI takes effect on the next reload without the
+    user having to remove and re-add the device. Out-of-range values are
+    clamped rather than rejected: the only way to get one is an entry
+    written by an older version or edited by hand, and refusing to set up
+    over it would be worse than quietly bringing it back in bounds.
+    """
+    configured = entry.options.get(CONF_SCAN_INTERVAL)
+    if configured is None:
+        return DEFAULT_SCAN_INTERVAL
+    seconds = max(SCAN_INTERVAL_MIN, min(SCAN_INTERVAL_MAX, int(configured)))
+    return timedelta(seconds=seconds)
+
+
 class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
     """Coordinator that polls `data/current`, using v2 if an API key is active."""
 
@@ -127,7 +147,7 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         client: Healthbox3ApiClient,
         *,
         use_v2: bool,
-        update_interval: timedelta = DEFAULT_SCAN_INTERVAL,
+        update_interval: timedelta | None = None,
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -135,7 +155,7 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             _LOGGER,
             config_entry=config_entry,
             name=DOMAIN,
-            update_interval=update_interval,
+            update_interval=update_interval or scan_interval(config_entry),
         )
         self.client = client
         self.use_v2 = use_v2
@@ -145,6 +165,10 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         )
         self._relocate_attempted = False
         self._tracked_error_issue_ids: set[str] = set()
+        # Last good `/renson_core/v2/global` read, and how many polls ago
+        # it was taken - see _async_get_global_data.
+        self._global_info: GlobalInfo | None = None
+        self._global_info_age = 0
         # The registry id of the unit's own device entry, which each room
         # device points at to nest under it. Filled in by async_setup_entry
         # before any platform is forwarded - see entity.py's _room_device
@@ -153,26 +177,53 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
 
     @override
     async def _async_update_data(self) -> Healthbox3Data:
+        """Fetch one full picture of the device.
+
+        `data/current` goes first and alone: it is the call that decides
+        whether this poll is a v2 or a v1 one, whether the key is still
+        good, and which rooms exist - everything below depends on one of
+        those answers, and it is the only call whose failure fails the
+        whole update.
+
+        The rest read different endpoints and none depends on another, so
+        they go out together instead of one after the next. On a
+        seven-room installation that is 14 requests; sequentially, at up
+        to the 10s per-request timeout, a slow poll could outlast the
+        interval that scheduled it. The client bounds how many are
+        actually in flight (see MAX_CONCURRENT_REQUESTS), so this
+        overlaps the round-trips without dumping the lot on the device.
+
+        A TaskGroup rather than `asyncio.gather`: gather collapses eight
+        differently-typed results into one union that then has to be
+        picked apart by hand, while a task keeps its own type. Failures
+        are not swallowed either - each helper already absorbs its own
+        Healthbox3Error and degrades to None/{}/[], so anything still
+        propagating here is a real programming error and should surface
+        as one rather than quietly becoming a missing reading.
+        """
         healthbox = await self._async_get_healthbox_data()
-        boost = await self._async_get_boost_data(healthbox)
-        decision = await self._async_get_decision_data()
-        breeze = await self._async_get_breeze_data()
-        room_decisions = await self._async_get_room_decisions_data()
-        global_info = await self._async_get_global_data()
-        errors = await self._async_get_errors_data()
-        device = await self._async_get_device_data()
-        wifi = await self._async_get_wifi_data()
-        self._async_reconcile_error_issues(errors)
+
+        async with asyncio.TaskGroup() as group:
+            boost = group.create_task(self._async_get_boost_data(healthbox))
+            decision = group.create_task(self._async_get_decision_data())
+            breeze = group.create_task(self._async_get_breeze_data())
+            room_decisions = group.create_task(self._async_get_room_decisions_data())
+            global_info = group.create_task(self._async_get_global_data())
+            errors = group.create_task(self._async_get_errors_data())
+            device = group.create_task(self._async_get_device_data())
+            wifi = group.create_task(self._async_get_wifi_data())
+
+        self._async_reconcile_error_issues(errors.result())
         return Healthbox3Data(
             healthbox=healthbox,
-            boost=boost,
-            decision=decision,
-            breeze=breeze,
-            room_decisions=room_decisions,
-            global_info=global_info,
-            errors=errors,
-            device=device,
-            wifi=wifi,
+            boost=boost.result(),
+            decision=decision.result(),
+            breeze=breeze.result(),
+            room_decisions=room_decisions.result(),
+            global_info=global_info.result(),
+            errors=errors.result(),
+            device=device.result(),
+            wifi=wifi.result(),
         )
 
     async def _async_get_decision_data(self) -> DeviceDecision | None:
@@ -218,15 +269,37 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
 
     async def _async_get_global_data(self) -> GlobalInfo | None:
         """Fetch `/renson_core/v2/global` - same gating/tolerance as
-        decision/breeze/room_decisions.
+        decision/breeze/room_decisions, but not on every poll.
+
+        Firmware version, MAC, IP and serial do not change between two
+        polls; they change on a firmware update or a network move. So a
+        good answer is reused for GLOBAL_INFO_REFRESH_EVERY polls (ten
+        minutes at the default interval) rather than re-asked every time.
+
+        Only *successful* reads are reused. A failure still drops to None
+        exactly as before - the entities built on it go unavailable and
+        the next poll asks again - rather than papering over an
+        unreachable endpoint with a stale reading.
         """
         if not self.use_v2:
             return None
+
+        if self._global_info is not None:
+            self._global_info_age += 1
+            if self._global_info_age < GLOBAL_INFO_REFRESH_EVERY:
+                return self._global_info
+
         try:
-            return await self.client.async_get_global()
+            info = await self.client.async_get_global()
         except Healthbox3Error as err:
             _LOGGER.debug("Failed to fetch global device info: %s", err)
+            self._global_info = None
+            self._global_info_age = 0
             return None
+
+        self._global_info = info
+        self._global_info_age = 0
+        return info
 
     async def _async_get_errors_data(self) -> list[DeviceError]:
         """Fetch `/v1/error` - same gating/tolerance as room_decisions (a
