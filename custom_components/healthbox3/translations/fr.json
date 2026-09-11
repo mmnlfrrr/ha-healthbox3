@@ -185,6 +185,9 @@
       "room_valve_port": {
         "name": "Numéro de bouche"
       },
+      "room_legislation_code": {
+        "name": "Code réglementaire"
+      },
       "room_conductance": {
         "name": "Conductance de la gaine"
       },

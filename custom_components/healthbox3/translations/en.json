@@ -185,6 +185,9 @@
       "room_valve_port": {
         "name": "Valve port"
       },
+      "room_legislation_code": {
+        "name": "Legislation code"
+      },
       "room_conductance": {
         "name": "Duct conductance"
       },

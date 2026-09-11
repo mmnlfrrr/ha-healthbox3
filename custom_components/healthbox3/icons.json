@@ -104,6 +104,9 @@
       "room_valve_port": {
         "default": "mdi:valve"
       },
+      "room_legislation_code": {
+        "default": "mdi:scale-balance"
+      },
       "room_conductance": {
         "default": "mdi:pipe-valve"
       },

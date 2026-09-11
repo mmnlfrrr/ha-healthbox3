@@ -34,6 +34,7 @@ from .api import (
     Room,
     Sensor,
     categorize_aqi_quality,
+    room_legislation_code,
     room_valve_port,
 )
 from .const import (
@@ -312,6 +313,15 @@ async def async_setup_entry(
         if _room_nominal_flow(room) is not None:
             entities.append(
                 Healthbox3RoomNominalAirflowSensor(
+                    coordinator, serial, room.id, room.name
+                )
+            )
+        # Reported by some units and not others (absent from the test
+        # fixture, present in a real capture), so it's per-room optional
+        # rather than assumed.
+        if room_legislation_code(room) is not None:
+            entities.append(
+                Healthbox3RoomLegislationCodeSensor(
                     coordinator, serial, room.id, room.name
                 )
             )
@@ -901,6 +911,55 @@ class Healthbox3RoomNominalAirflowSensor(_Healthbox3RoomValueSensor):
     @override
     def _room_value(self, room: Room) -> float | None:
         return _room_nominal_flow(room)
+
+
+class Healthbox3RoomLegislationCodeSensor(Healthbox3Entity, SensorEntity):
+    """A room's regulatory destination code, e.g. "C16" for a bathroom.
+
+    What the ventilation standard classes the room as - which is what set
+    its nominal flow when the unit was commissioned, so it's the context
+    that explains why one room's Qnom is 45 m3/h and another's 26. The
+    Renson app prints it beside each room's name.
+
+    Left as the device's own string rather than expanded to a label: the
+    code set is defined by the applicable standard, not by Renson, and
+    guessing at codes this unit has never reported would be inventing a
+    mapping. No state class - it's a commissioning constant, not a
+    reading.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "room_legislation_code"
+
+    def __init__(
+        self,
+        coordinator: Healthbox3DataUpdateCoordinator,
+        serial: str,
+        room_id: int,
+        room_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator, serial, room=RoomRef(id=room_id, name=room_name)
+        )
+        self._room_id = room_id
+        self._attr_unique_id = f"{serial}_room{room_id}_legislation_code"
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Return whether this room still reports a code."""
+        return super().available and self.native_value is not None
+
+    @property
+    @override
+    def native_value(self) -> str | None:
+        """Return the room's code, if reported."""
+        room = next(
+            (r for r in self.coordinator.data.healthbox.rooms if r.id == self._room_id),
+            None,
+        )
+        return room_legislation_code(room) if room is not None else None
 
 
 class Healthbox3RoomValvePortSensor(_Healthbox3RoomValueSensor):

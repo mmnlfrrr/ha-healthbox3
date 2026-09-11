@@ -185,6 +185,9 @@
       "room_valve_port": {
         "name": "Klepaansluiting"
       },
+      "room_legislation_code": {
+        "name": "Wetgevingscode"
+      },
       "room_conductance": {
         "name": "Kanaalconductantie"
       },

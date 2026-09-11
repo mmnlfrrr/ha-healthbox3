@@ -31,6 +31,7 @@ EXTRA_SENSOR_KEYS = {
     "room_nominal_airflow",
     "room_valve_pressure",
     "room_valve_port",
+    "room_legislation_code",
     "room_conductance",
     "global_aqi",
     # The two enum (qualification band) sensors. They were missing from

@@ -119,6 +119,17 @@ API_RENSON_CORE_V1_WIFI_STATUS = "/renson_core/v1/wifi/client/status"
 # "1"), hence the int() coercion at the parse site.
 ROOM_PARAM_VALVE = "valve"
 
+# The room's regulatory destination code (e.g. "C16" bathroom, "C22"
+# toilet, "C3" kitchen) - what the ventilation standard classes the room
+# as, which is what sets its nominal flow at commissioning. The Renson app
+# prints it next to each room's name.
+#
+# Not present on every unit: it appears in a real device capture (see
+# API.md) but not in docs/fixtures/v2-data-current.json, so the entity
+# built on it is created only for rooms that actually report it rather
+# than assumed universal.
+ROOM_PARAM_LEGISLATION_CODE = "legislation_code"
+
 # Both blocks nest their actual value one level deeper under a "0" key
 # (conductance.c_collector.<port>.c_ij.0, cmode_pressures.p_collector.
 # <port>.0). Confirmed on real hardware for all 7 ports; no port has ever

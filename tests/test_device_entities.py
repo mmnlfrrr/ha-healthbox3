@@ -18,6 +18,7 @@ from unittest.mock import patch
 import pytest
 from homeassistant.helpers import entity_registry as er
 
+from custom_components.healthbox3 import api as api_mod
 from custom_components.healthbox3.const import DOMAIN, ENERGY_MAX_GAP_SECONDS
 
 from .conftest import setup_integration
@@ -163,6 +164,35 @@ async def test_room_duct_sensors_not_created_without_a_valve_parameter(
     assert _state(hass, "sensor", stripped.serial, "room1_valve_pressure") is None
     assert _state(hass, "sensor", stripped.serial, "room1_conductance") is None
     assert _state(hass, "sensor", stripped.serial, "room1_valve_port") is None
+
+
+async def test_legislation_code_sensor_created_only_for_rooms_that_report_one(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The fixture unit reports no legislation_code at all, and a real
+    capture does - so the entity has to follow the parameter rather than
+    exist for every room. A blank code counts as absent: real units carry
+    blank parameters as readily as missing ones.
+    """
+    coded = copy.deepcopy(v2_data)
+    next(r for r in coded.rooms if r.id == 1).parameters["legislation_code"] = (
+        api_mod.Parameter(value="C22")
+    )
+    next(r for r in coded.rooms if r.id == 2).parameters["legislation_code"] = (
+        api_mod.Parameter(value="   ")
+    )
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=coded.serial,
+        healthbox_data=coded,
+        boost_status=boost_status,
+    )
+
+    assert _state(hass, "sensor", coded.serial, "room1_legislation_code").state == "C22"
+    assert _state(hass, "sensor", coded.serial, "room2_legislation_code") is None
+    assert _state(hass, "sensor", coded.serial, "room3_legislation_code") is None
 
 
 async def test_valve_port_sensor_reports_the_wired_port_not_the_room_id(

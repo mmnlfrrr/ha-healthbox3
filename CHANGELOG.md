@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Legislation code` sensor per room (diagnostic): the room's regulatory
+  destination code (`C16`, `C22`, `C3`…), which is what the ventilation
+  standard classes the room as and therefore what set its nominal flow at
+  commissioning - the context that explains why one room's Qnom is 45 m³/h
+  and another's 26. Shown beside each room's name in the Renson app.
+  Reported by some units and not others, so it's created per room only
+  where the device actually reports it, and a blank value counts as
+  absent.
 - `Valve port` sensor per room (diagnostic): which collector port the
   room's valve is wired to - the number printed on the unit, and the one
   the Renson app lists rooms by. Already used internally to join rooms to

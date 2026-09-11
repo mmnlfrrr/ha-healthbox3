@@ -32,6 +32,7 @@ from .const import (
     DISCOVERY_PORT,
     DISCOVERY_TIMEOUT,
     PROFILES,
+    ROOM_PARAM_LEGISLATION_CODE,
     ROOM_PARAM_VALVE,
     SILENT_WEEKDAYS,
 )
@@ -545,6 +546,20 @@ def _parse_wifi(raw: dict[str, Any]) -> WifiStatus:
         internet_connection=internet if isinstance(internet, bool) else None,
         connection_error=_optional_str(raw.get("connection_error")),
     )
+
+
+def room_legislation_code(room: Room) -> str | None:
+    """Return a room's regulatory destination code, if reported.
+
+    An empty string is treated as "not reported": rooms on real hardware
+    carry blank parameters as often as absent ones (`icon` and `subzone`
+    both show this in docs/fixtures/v2-data-current.json), and a blank
+    code is not a code.
+    """
+    parameter = room.parameters.get(ROOM_PARAM_LEGISLATION_CODE)
+    if parameter is None or not isinstance(parameter.value, str):
+        return None
+    return parameter.value.strip() or None
 
 
 def room_valve_port(room: Room) -> int | None:
