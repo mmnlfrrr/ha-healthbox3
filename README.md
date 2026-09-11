@@ -1,13 +1,13 @@
 # Renson Healthbox 3 for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/TrojanHorsePower/ha-healthbox3.svg)](https://github.com/TrojanHorsePower/ha-healthbox3/releases)
-[![License](https://img.shields.io/github/license/TrojanHorsePower/ha-healthbox3.svg)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/release/mmnlfrrr/ha-healthbox3.svg)](https://github.com/mmnlfrrr/ha-healthbox3/releases)
+[![License](https://img.shields.io/github/license/mmnlfrrr/ha-healthbox3.svg)](LICENSE)
 [![HA Quality Scale](https://img.shields.io/badge/HA%20Quality%20Scale-Platinum-9c6ade.svg)](custom_components/healthbox3/quality_scale.yaml)
-[![CI](https://img.shields.io/github/actions/workflow/status/TrojanHorsePower/ha-healthbox3/ci.yml?label=CI)](https://github.com/TrojanHorsePower/ha-healthbox3/actions/workflows/ci.yml)
-[![HACS Validate](https://img.shields.io/github/actions/workflow/status/TrojanHorsePower/ha-healthbox3/hacs.yml?label=HACS%20Validate)](https://github.com/TrojanHorsePower/ha-healthbox3/actions/workflows/hacs.yml)
-[![hassfest](https://img.shields.io/github/actions/workflow/status/TrojanHorsePower/ha-healthbox3/hassfest.yml?label=hassfest)](https://github.com/TrojanHorsePower/ha-healthbox3/actions/workflows/hassfest.yml)
-[![mypy](https://img.shields.io/github/actions/workflow/status/TrojanHorsePower/ha-healthbox3/mypy.yml?label=mypy)](https://github.com/TrojanHorsePower/ha-healthbox3/actions/workflows/mypy.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/mmnlfrrr/ha-healthbox3/ci.yml?label=CI)](https://github.com/mmnlfrrr/ha-healthbox3/actions/workflows/ci.yml)
+[![HACS Validate](https://img.shields.io/github/actions/workflow/status/mmnlfrrr/ha-healthbox3/hacs.yml?label=HACS%20Validate)](https://github.com/mmnlfrrr/ha-healthbox3/actions/workflows/hacs.yml)
+[![hassfest](https://img.shields.io/github/actions/workflow/status/mmnlfrrr/ha-healthbox3/hassfest.yml?label=hassfest)](https://github.com/mmnlfrrr/ha-healthbox3/actions/workflows/hassfest.yml)
+[![mypy](https://img.shields.io/github/actions/workflow/status/mmnlfrrr/ha-healthbox3/mypy.yml?label=mypy)](https://github.com/mmnlfrrr/ha-healthbox3/actions/workflows/mypy.yml)
 
 A custom Home Assistant integration for the [Renson Healthbox
 3](https://renson.net/gd-gb/products/ventilation/healthbox), a whole-house
@@ -98,13 +98,19 @@ taking that on, please open a GitHub issue to discuss it.
 
 ### HACS
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=TrojanHorsePower&repository=ha-healthbox3&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mmnlfrrr&repository=ha-healthbox3&category=integration)
 
 Or manually:
 
-1. In HACS, search for "Renson Healthbox 3" and install it (it's part
-   of the default HACS store, no need to add a custom repository).
+1. In HACS, open the ⋮ menu → **Custom repositories**, add
+   `https://github.com/mmnlfrrr/ha-healthbox3` with category
+   **Integration**, then search for "Renson Healthbox 3" and download it.
 2. Restart Home Assistant.
+
+This fork is not in the HACS default store - only
+[upstream](https://github.com/TrojanHorsePower/ha-healthbox3) is, and it
+does not contain the changes listed under [This fork](#this-fork). Adding
+it as a custom repository is what gets you this one.
 
 ### Manual
 
@@ -636,3 +642,60 @@ above).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the versioning scheme and
 release process, and [CHANGELOG.md](CHANGELOG.md) for release history.
+
+## This fork
+
+This repository is a fork of
+[TrojanHorsePower/ha-healthbox3](https://github.com/TrojanHorsePower/ha-healthbox3),
+which is where the integration comes from and where everything up to and
+including **0.3.3** was built - the config and discovery flows, the API
+client, boost and profile control, the demand-control and Silent
+settings, the quality-scale work. That groundwork is not restated below;
+this section is only what has been added here since, and it is a summary
+of [CHANGELOG.md](CHANGELOG.md)'s `[Unreleased]` section, which has the
+detail and the reasoning.
+
+**A lot more of the device is read.** Upstream stops at the rooms and
+their boost status. This fork also reads `/v1/device` and
+`/renson_core/v2/global`, which brings whole-device and fan power, an
+`Energy` sensor wired straight into the Energy dashboard, fan speed,
+voltage and pressures, the device's own calibrated duct model (per-room
+valve pressure and conductance, network leakage), absolute airflow in
+m³/h beside the existing percentage, Wi-Fi status, IP/MAC/connection
+type, and each room's valve port, regulatory code and Renson pictogram.
+
+**Each ventilated room is its own device**, linked to the unit, instead
+of every entity sitting on one. That is what makes areas usable: Home
+Assistant assigns areas per device, so a room's sensors can be placed in
+that room's area in one action rather than one entity at a time. Rooms
+added on the device afterwards appear without a reload, and the device of
+a room that no longer exists can be deleted.
+
+**There is a dashboard card**, drawing the unit and its outlets the way
+Renson's own app does, with each room's readings on hover - see
+[Dashboard card](#dashboard-card). It uses Renson's own artwork and
+pictograms, and the integration serves it, so there is no resource to
+register.
+
+**Polling is lighter and configurable.** A poll fans its endpoints out
+concurrently instead of walking them one at a time, caps how many reach
+the device at once, and stops re-reading values that do not change
+between polls. The interval is a per-entry option rather than a constant.
+
+**Six bugs are fixed**, four of them silent: a correct API key reported
+as rejected while the device was still validating it; the room
+pictograms never rendering at all, because the icon name addressed a set
+that does not exist; the hover panel escaping the card on browsers
+without CSS anchor positioning; an unparseable silent-schedule time
+taking both time entities out of the UI entirely; a deprecation warning
+naming this integration in the log on every startup, heading for a hard
+break in Home Assistant 2027.8; and diagnostics publishing the device's
+MAC address and IP in clear.
+
+The French and Dutch translations were also re-checked against the
+wording of Renson's own apps, and the air quality bands now carry
+Renson's names.
+
+Upstream is not obsolete, and none of this has been sent back to it. If
+you want the version that is in the HACS default store and is maintained
+by its author, use upstream. Use this one if you want the above.
