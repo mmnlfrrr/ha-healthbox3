@@ -82,6 +82,31 @@ async def test_setup_entry_with_already_invalid_key_triggers_reauth(hass, mock_a
     assert any(f["context"].get("source") == SOURCE_REAUTH for f in progress)
 
 
+async def test_setup_while_key_is_validating_retries_instead_of_reauth(
+    hass, mock_api_client, v2_data
+):
+    """The device re-checks its key with Renson on its own after a reboot,
+    and reports "validating" while it does. Nothing is wrong and nothing is
+    decided yet, so setup must retry - not ask the user to re-enter a key
+    that is almost certainly fine.
+    """
+    mock_api_client.async_get_api_key_status = AsyncMock(
+        return_value=api_mod.ApiKeyStatus(
+            state="validating",
+            disable_telemetry_data_allowed=False,
+            local_sensor_data_allowed=False,
+        )
+    )
+    entry = make_config_entry(hass, serial=v2_data.serial)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    progress = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert not any(f["context"].get("source") == SOURCE_REAUTH for f in progress)
+
+
 async def test_setup_entry_connection_error_retries(hass, mock_api_client, v2_data):
     mock_api_client.async_get_api_key_status = AsyncMock(
         side_effect=api_mod.Healthbox3ConnectionError("offline")

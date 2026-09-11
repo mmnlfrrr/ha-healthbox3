@@ -18,7 +18,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from custom_components.healthbox3 import api as api_mod
-from custom_components.healthbox3.const import DOMAIN
+from custom_components.healthbox3.const import API_KEY_ACTIVATION_ATTEMPTS, DOMAIN
 
 from .conftest import make_config_entry
 
@@ -927,3 +927,160 @@ async def test_reauth_flow_activation_succeeds_but_status_reports_invalid(
         assert result["type"] is FlowResultType.FORM
         assert result["step_id"] == "reauth_confirm"
         assert result["errors"] == {"base": "invalid_api_key"}
+
+
+def _validating_status() -> api_mod.ApiKeyStatus:
+    """The state the device reports while it checks a key with Renson."""
+    return api_mod.ApiKeyStatus(
+        state="validating",
+        disable_telemetry_data_allowed=False,
+        local_sensor_data_allowed=False,
+    )
+
+
+def _valid_status() -> api_mod.ApiKeyStatus:
+    return api_mod.ApiKeyStatus(
+        state="valid",
+        disable_telemetry_data_allowed=True,
+        local_sensor_data_allowed=True,
+    )
+
+
+@contextmanager
+def _no_activation_delay():
+    """Drop the inter-poll sleep so waiting out "validating" costs no time."""
+    with patch(
+        "custom_components.healthbox3.config_flow.API_KEY_ACTIVATION_POLL_SECONDS", 0
+    ):
+        yield
+
+
+async def test_api_key_step_waits_out_validating_then_succeeds(
+    hass, mock_api_client, v1_data, boost_status
+):
+    """A correct key reads as "validating" for the first few seconds after
+    it is POSTed - the device has to check it against Renson's servers -
+    and only then flips to "valid". Reading the status once would see the
+    "validating" and report a working key as rejected, so the flow has to
+    keep asking.
+    """
+    mock_api_client.async_get_api_key_status = AsyncMock(return_value=_valid_status())
+    mock_api_client.async_get_v2_data_current = AsyncMock(return_value=v1_data)
+    mock_api_client.async_get_boost = AsyncMock(return_value=boost_status)
+
+    with _patch_client() as mock_cls, _no_activation_delay():
+        instance = mock_cls.return_value
+        instance.async_get_v1_data_current = AsyncMock(return_value=v1_data)
+        instance.async_activate_api_key = AsyncMock(return_value=None)
+        instance.async_get_api_key_status = AsyncMock(
+            side_effect=[_validating_status(), _validating_status(), _valid_status()]
+        )
+
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: "192.0.2.1"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: "goodkey"}
+        )
+
+        assert instance.async_get_api_key_status.await_count == 3
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_API_KEY] == "goodkey"
+    await hass.async_block_till_done()
+
+
+async def test_api_key_step_still_validating_is_not_reported_as_invalid(hass, v1_data):
+    """A device that never settles (no internet, so it can never reach
+    Renson to check the key) must say so, not accuse the user's key of
+    being wrong.
+    """
+    with _patch_client() as mock_cls, _no_activation_delay():
+        instance = mock_cls.return_value
+        instance.async_get_v1_data_current = AsyncMock(return_value=v1_data)
+        instance.async_activate_api_key = AsyncMock(return_value=None)
+        instance.async_get_api_key_status = AsyncMock(
+            return_value=_validating_status()
+        )
+
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: "192.0.2.1"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: "goodkey"}
+        )
+
+        assert (
+            instance.async_get_api_key_status.await_count
+            == API_KEY_ACTIVATION_ATTEMPTS
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "api_key"
+    assert result["errors"] == {"base": "api_key_pending"}
+
+
+async def test_reauth_flow_waits_out_validating(
+    hass, mock_api_client, v1_data, boost_status
+):
+    """Same asynchronous activation, entered through reauth instead."""
+    entry = make_config_entry(hass, serial=v1_data.serial, api_key="oldkey")
+    mock_api_client.async_get_api_key_status = AsyncMock(return_value=_valid_status())
+    mock_api_client.async_get_v2_data_current = AsyncMock(return_value=v1_data)
+    mock_api_client.async_get_boost = AsyncMock(return_value=boost_status)
+
+    with _patch_client() as mock_cls, _no_activation_delay():
+        instance = mock_cls.return_value
+        instance.async_activate_api_key = AsyncMock(return_value=None)
+        instance.async_get_api_key_status = AsyncMock(
+            side_effect=[_validating_status(), _valid_status()]
+        )
+
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_REAUTH, "entry_id": entry.entry_id},
+            data=entry.data,
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: "newkey"}
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert entry.data[CONF_API_KEY] == "newkey"
+
+
+async def test_reconfigure_flow_waits_out_validating(
+    hass, mock_api_client, v1_data, boost_status
+):
+    """Same asynchronous activation, entered through reconfigure."""
+    entry = make_config_entry(hass, serial=v1_data.serial, api_key=None)
+    mock_api_client.async_get_api_key_status = AsyncMock(return_value=_valid_status())
+    mock_api_client.async_get_v2_data_current = AsyncMock(return_value=v1_data)
+    mock_api_client.async_get_boost = AsyncMock(return_value=boost_status)
+
+    with _patch_client() as mock_cls, _no_activation_delay():
+        instance = mock_cls.return_value
+        instance.async_get_v1_data_current = AsyncMock(return_value=v1_data)
+        instance.async_activate_api_key = AsyncMock(return_value=None)
+        instance.async_get_api_key_status = AsyncMock(
+            side_effect=[_validating_status(), _valid_status()]
+        )
+
+        result = await _start_reconfigure(hass, entry)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "192.0.2.1", CONF_API_KEY: "newkey"},
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_API_KEY] == "newkey"

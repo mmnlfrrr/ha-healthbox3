@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 import logging
 from typing import Any, override
@@ -20,11 +21,52 @@ from .api import (
     Healthbox3Error,
     async_discover_broadcast,
 )
-from .const import DOMAIN
+from .const import (
+    API_KEY_ACTIVATION_ATTEMPTS,
+    API_KEY_ACTIVATION_POLL_SECONDS,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 _MANUAL_HOST_SCHEMA = vol.Schema({vol.Required(CONF_HOST): str})
+
+
+async def _async_activate_api_key(
+    client: Healthbox3ApiClient, api_key: str
+) -> dict[str, str]:
+    """Activate `api_key`, wait for a verdict, and report it as a flow errors dict.
+
+    Activation is asynchronous on the device's side: POSTing a key decides
+    nothing by itself, because the device has to reach Renson's servers to
+    check the key against its own serial. `/v2/api/api_key/status` answers
+    "validating" for as long as that takes, so reading the status once,
+    right after activating, reads a perfectly *correct* key as not-valid -
+    and reporting that as "invalid_api_key" is how a key that works ends up
+    being announced as wrong. Hence the poll instead of a single read.
+
+    Shared by the three places a key can be entered (initial setup,
+    reconfigure, reauth) so all three distinguish the same three outcomes:
+    accepted (empty dict), rejected, and still-undecided after
+    API_KEY_ACTIVATION_ATTEMPTS tries - the last being its own message, not
+    a rejection.
+    """
+    try:
+        await client.async_activate_api_key(api_key)
+        status = await client.async_get_api_key_status()
+        for _ in range(API_KEY_ACTIVATION_ATTEMPTS - 1):
+            if not status.is_pending:
+                break
+            await asyncio.sleep(API_KEY_ACTIVATION_POLL_SECONDS)
+            status = await client.async_get_api_key_status()
+    except Healthbox3Error:
+        return {"base": "invalid_api_key"}
+
+    if status.is_valid:
+        return {}
+    if status.is_pending:
+        return {"base": "api_key_pending"}
+    return {"base": "invalid_api_key"}
 
 
 class Healthbox3ConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -254,14 +296,7 @@ class Healthbox3ConfigFlow(ConfigFlow, domain=DOMAIN):
                 client = Healthbox3ApiClient(
                     self._host, async_get_clientsession(self.hass)
                 )
-                try:
-                    await client.async_activate_api_key(api_key)
-                    status = await client.async_get_api_key_status()
-                except Healthbox3Error:
-                    errors["base"] = "invalid_api_key"
-                else:
-                    if not status.is_valid:
-                        errors["base"] = "invalid_api_key"
+                errors = await _async_activate_api_key(client, api_key)
 
             if not errors:
                 return self.async_create_entry(
@@ -308,16 +343,9 @@ class Healthbox3ConfigFlow(ConfigFlow, domain=DOMAIN):
                 data_updates: dict[str, Any] = {CONF_HOST: host}
                 new_api_key = user_input.get(CONF_API_KEY) or None
                 if new_api_key:
-                    try:
-                        await client.async_activate_api_key(new_api_key)
-                        status = await client.async_get_api_key_status()
-                    except Healthbox3Error:
-                        errors["base"] = "invalid_api_key"
-                    else:
-                        if not status.is_valid:
-                            errors["base"] = "invalid_api_key"
-                        else:
-                            data_updates[CONF_API_KEY] = new_api_key
+                    errors = await _async_activate_api_key(client, new_api_key)
+                    if not errors:
+                        data_updates[CONF_API_KEY] = new_api_key
 
                 if not errors:
                     return self.async_update_reload_and_abort(
@@ -353,20 +381,13 @@ class Healthbox3ConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             api_key = user_input[CONF_API_KEY]
             client = Healthbox3ApiClient(self._host, async_get_clientsession(self.hass))
-            try:
-                await client.async_activate_api_key(api_key)
-                status = await client.async_get_api_key_status()
-            except Healthbox3Error:
-                errors["base"] = "invalid_api_key"
-            else:
-                if not status.is_valid:
-                    errors["base"] = "invalid_api_key"
-                else:
-                    reauth_entry = self._get_reauth_entry()
-                    return self.async_update_reload_and_abort(
-                        reauth_entry,
-                        data={**reauth_entry.data, CONF_API_KEY: api_key},
-                    )
+            errors = await _async_activate_api_key(client, api_key)
+            if not errors:
+                reauth_entry = self._get_reauth_entry()
+                return self.async_update_reload_and_abort(
+                    reauth_entry,
+                    data={**reauth_entry.data, CONF_API_KEY: api_key},
+                )
 
         return self.async_show_form(
             step_id="reauth_confirm",

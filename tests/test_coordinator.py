@@ -592,6 +592,31 @@ async def test_key_invalid_downgrades_to_v1_and_starts_reauth(
     assert any(f["context"].get("source") == SOURCE_REAUTH for f in progress)
 
 
+async def test_key_validating_is_not_treated_as_revoked(hass, v2_data):
+    """A v2 failure while the device happens to be re-validating its key is
+    undecided, not a revocation - downgrading to v1 and starting a reauth
+    flow over a state that clears on its own would be a false alarm.
+    """
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    client = AsyncMock(spec=api_mod.Healthbox3ApiClient)
+    client.async_get_v2_data_current.side_effect = api_mod.Healthbox3InvalidResponseError(
+        "garbled"
+    )
+    client.async_get_api_key_status.return_value = api_mod.ApiKeyStatus(
+        state="validating",
+        disable_telemetry_data_allowed=False,
+        local_sensor_data_allowed=False,
+    )
+
+    coordinator = Healthbox3DataUpdateCoordinator(hass, entry, client, use_v2=True)
+    await coordinator.async_refresh()
+
+    assert coordinator.use_v2 is True
+    await hass.async_block_till_done()
+    progress = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert not any(f["context"].get("source") == SOURCE_REAUTH for f in progress)
+
+
 async def test_invalid_response_disambiguated_via_key_status(hass, v2_data):
     """A v2 parse failure while the key is still valid is transient, not a reauth trigger."""
     entry = make_config_entry(hass, serial=v2_data.serial)

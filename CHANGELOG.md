@@ -160,6 +160,20 @@ on an active API key.
 
 ### Fixed
 
+- **A correct API key could be reported as invalid.** Activating a key is
+  asynchronous on the device's side: it has to reach Renson's servers to
+  check the key against its own serial, and answers `validating` until that
+  finishes. The config flow read the status once, immediately after
+  submitting - catching exactly that window - and, seeing something other
+  than `valid`, told the user the key had been rejected. The same key then
+  worked. All three places a key can be entered (setup, reconfigure,
+  reauthentication) now wait for the device to actually decide, and a
+  device that never settles gets its own message (it needs internet access
+  to validate) instead of being blamed on the key.
+- Related: a device re-validating its key on its own - which it does after
+  a reboot - no longer trips a spurious reauthentication prompt at startup,
+  nor a silent downgrade to v1. Setup retries and the coordinator waits it
+  out instead.
 - **The per-room CO2 threshold number was reading and writing the wrong
   field.** It showed and set `minimum`, but confirmed against a fresh
   device capture cross-referenced with the Renson app, the app displays

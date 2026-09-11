@@ -143,6 +143,22 @@ ENERGY_MAX_GAP_SECONDS = 15 * 60
 API_KEY_STATE_VALID = "valid"
 API_KEY_STATE_EMPTY = "empty"
 
+# Third state of /v2/api/api_key/status, and the one that makes activation
+# asynchronous: POSTing a key does NOT decide anything by itself. The device
+# has to reach Renson's servers to check the key against its own serial, and
+# reports "validating" until that round-trip finishes. A correct key therefore
+# reads as "not valid" for the first few seconds after it is submitted, which
+# is exactly the window a config flow submits in - so "validating" must be
+# treated as "not decided yet", never as a rejection.
+API_KEY_STATE_VALIDATING = "validating"
+
+# How long to keep asking the device before giving up on a pending validation.
+# Counted in attempts rather than wall-clock so the wait is deterministic;
+# 15 x 2s is ~30s, past which the config flow reports "still validating" (a
+# distinct message from "rejected") instead of blocking the UI any longer.
+API_KEY_ACTIVATION_ATTEMPTS = 15
+API_KEY_ACTIVATION_POLL_SECONDS = 2.0
+
 PROFILE_ECO = "eco"
 PROFILE_HEALTH = "health"
 PROFILE_INTENSE = "intense"

@@ -45,6 +45,7 @@
     "error": {
       "cannot_connect": "Kan geen verbinding maken met het apparaat. Controleer het IP-adres en of het bereikbaar is op je netwerk.",
       "invalid_api_key": "De API-sleutel werd geweigerd. Controleer de sleutel en of deze overeenkomt met het serienummer/garantienummer van dit apparaat.",
+      "api_key_pending": "Het apparaat valideert deze sleutel nog bij Renson en heeft nog niet geantwoord. Daarvoor heeft het internettoegang nodig. Controleer de verbinding en probeer over een minuut opnieuw.",
       "unknown": "Onverwachte fout"
     },
     "abort": {

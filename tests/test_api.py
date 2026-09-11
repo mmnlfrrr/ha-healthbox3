@@ -119,6 +119,31 @@ async def test_activate_and_check_api_key():
     assert status.is_valid is True
 
 
+def test_api_key_status_validating_is_neither_valid_nor_rejected():
+    """The third state of /v2/api/api_key/status. `is_valid` is False for
+    it - privileged access really isn't active yet - but that must not be
+    read as a rejection, which is what `is_pending` exists to say.
+    """
+    status = api_mod.ApiKeyStatus(
+        state="validating",
+        disable_telemetry_data_allowed=False,
+        local_sensor_data_allowed=False,
+    )
+
+    assert status.is_valid is False
+    assert status.is_pending is True
+
+    for settled in ("valid", "empty"):
+        assert (
+            api_mod.ApiKeyStatus(
+                state=settled,
+                disable_telemetry_data_allowed=False,
+                local_sensor_data_allowed=False,
+            ).is_pending
+            is False
+        )
+
+
 async def test_set_profile_rejects_unknown_profile():
     client = api_mod.Healthbox3ApiClient("192.0.2.1", _FakeSession([]))
 

@@ -45,6 +45,7 @@
     "error": {
       "cannot_connect": "Failed to connect to the device. Check the IP address and that it's reachable on your network.",
       "invalid_api_key": "The API key was rejected. Double check the key and that it matches this device's serial/warranty number.",
+      "api_key_pending": "The device is still validating this key with Renson and has not answered yet. It needs internet access to do that. Check the device's connection and try again in a minute.",
       "unknown": "Unexpected error"
     },
     "abort": {

@@ -407,7 +407,12 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             status = await self.client.async_get_api_key_status()
         except Healthbox3Error:
             return True
-        return status.is_valid
+        # "validating" means the device is re-checking the key with Renson,
+        # which it also does by itself after a reboot. Treated like the
+        # error case above - undecided, so assume the key is fine and let a
+        # later poll settle it, rather than starting a reauth flow over a
+        # state that clears on its own.
+        return status.is_valid or status.is_pending
 
     def _async_handle_key_invalid(self) -> None:
         """Fall back to v1-only and request reauth, without failing this update.

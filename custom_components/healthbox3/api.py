@@ -13,6 +13,7 @@ import aiohttp
 
 from .const import (
     API_KEY_STATE_VALID,
+    API_KEY_STATE_VALIDATING,
     API_RENSON_CORE_V1_WIFI_STATUS,
     API_RENSON_CORE_V2_GLOBAL,
     API_V1_BOOST,
@@ -148,6 +149,16 @@ class ApiKeyStatus:
     def is_valid(self) -> bool:
         """Return whether privileged v2 access is currently active."""
         return self.state == API_KEY_STATE_VALID
+
+    @property
+    def is_pending(self) -> bool:
+        """Return whether the device is still deciding about the key.
+
+        Distinct from `not is_valid`: a pending key is one the device has
+        accepted for checking and is currently verifying against Renson's
+        servers. It is not a rejection, and must not be reported as one.
+        """
+        return self.state == API_KEY_STATE_VALIDATING
 
 
 @dataclass

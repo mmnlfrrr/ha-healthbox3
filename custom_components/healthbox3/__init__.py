@@ -42,6 +42,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -
             "Unexpected error checking Healthbox 3 API key status"
         ) from err
 
+    if status.is_pending:
+        # The device is re-checking the key with Renson's servers - it does
+        # this on its own after a device reboot, not only right after a key
+        # is submitted. Nothing is wrong yet and nothing is decided yet, so
+        # retry setup rather than either losing v2 for the whole session or
+        # asking the user to re-enter a key that is probably fine.
+        raise ConfigEntryNotReady("Healthbox 3 is still validating its API key")
+
     use_v2 = status.is_valid
     if entry.data.get(CONF_API_KEY) and not status.is_valid:
         # The user told us they had a working key; the device now disagrees.

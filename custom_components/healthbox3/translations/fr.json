@@ -45,6 +45,7 @@
     "error": {
       "cannot_connect": "Échec de la connexion à l'appareil. Vérifiez l'adresse IP et son accessibilité sur votre réseau.",
       "invalid_api_key": "La clé API a été rejetée. Vérifiez la clé et qu'elle correspond bien au numéro de série/garantie de cet appareil.",
+      "api_key_pending": "L'appareil valide encore cette clé auprès de Renson et n'a pas encore répondu. Il lui faut un accès Internet pour cela. Vérifiez sa connexion et réessayez dans une minute.",
       "unknown": "Erreur inattendue"
     },
     "abort": {
