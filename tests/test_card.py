@@ -140,6 +140,41 @@ async def test_a_split_outlet_keeps_both_rooms_on_the_same_port(
     assert on_port_1 == [1, 2, 3]
 
 
+async def test_chains_on_every_edge_survive_into_the_layout(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """Splits are not a right-hand-edge curiosity: 2.1, 3.1, 6.3 and 7.2
+    are all shapes a real installation can take, and each edge of the
+    drawing chains in a different direction.
+
+    The layout has to keep every branch, grouped by port and ordered
+    within it, because that order is what becomes the `.1`, `.2`, `.3`
+    the card prints.
+    """
+    wired = copy.deepcopy(v2_data)
+    # ports 2 and 3 get two branches, 6 gets three, 7 keeps one.
+    ports = {1: 2, 2: 2, 3: 3, 4: 3, 5: 3, 6: 6, 7: 7}
+    for room in wired.rooms:
+        room.parameters["valve"].value = str(ports[room.id])
+
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=wired.serial,
+        healthbox_data=wired,
+        boost_status=boost_status,
+    )
+
+    rooms = build_layout(hass)["units"][0]["rooms"]
+    grouped: dict[int, list[int]] = {}
+    for room in rooms:
+        grouped.setdefault(room["port"], []).append(room["id"])
+
+    assert grouped == {2: [1, 2], 3: [3, 4, 5], 6: [6], 7: [7]}
+    # Ordered by port, then by room id, so the branch numbering is stable.
+    assert [room["port"] for room in rooms] == [2, 2, 3, 3, 3, 6, 7]
+
+
 async def test_an_error_is_pinned_to_an_outlet_only_when_it_names_a_port(
     hass, mock_api_client, v2_data, boost_status
 ):
