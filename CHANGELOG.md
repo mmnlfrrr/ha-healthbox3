@@ -605,7 +605,19 @@ on an active API key.
   every push and pull request.
 - README "Use cases", "Examples", and "Troubleshooting" sections.
 
-[Unreleased]: https://github.com/mmnlfrrr/ha-healthbox3/compare/0.3.3...HEAD
+<!--
+  This repository carries no tags yet, so a link naming one (0.3.3, say)
+  would 404 here however it is spelled. The Unreleased link therefore
+  compares from the commit upstream released as 0.3.3, by its SHA, which
+  does exist in this history. Once a release is tagged here, this becomes
+  a normal tag-to-HEAD compare.
+
+  The per-version links below stay on upstream on purpose: 0.1.0 to 0.3.3
+  were released there, and those tags exist nowhere else - repointing them
+  at this repository would turn ten working links into ten broken ones.
+-->
+
+[Unreleased]: https://github.com/mmnlfrrr/ha-healthbox3/compare/df843cf...master
 [0.3.3]: https://github.com/TrojanHorsePower/ha-healthbox3/compare/0.3.2...0.3.3
 [0.3.2]: https://github.com/TrojanHorsePower/ha-healthbox3/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/TrojanHorsePower/ha-healthbox3/compare/0.3.0...0.3.1
