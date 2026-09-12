@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `manifest.json`'s `codeowners` is `@mmnlfrrr`, this fork's maintainer,
+  rather than upstream's author. Home Assistant shows that name as the
+  person responsible for the integration's code, and it decides who a
+  core-side mention reaches - which should not be someone who has never
+  seen any of the code added here. Upstream's authorship of everything up
+  to 0.3.3 is credited in the README instead, where it belongs.
 - **A poll is five requests now, whatever the room count.** It was seven
   plus one per room - fourteen on a seven-room installation - because
   boost was read one room at a time, and the decision settings, Breeze

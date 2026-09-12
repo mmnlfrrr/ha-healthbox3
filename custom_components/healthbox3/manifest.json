@@ -6,7 +6,7 @@
     "http"
   ],
   "codeowners": [
-    "@TrojanHorsePower"
+    "@mmnlfrrr"
   ],
   "config_flow": true,
   "dhcp": [
