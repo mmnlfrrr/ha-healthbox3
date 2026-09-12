@@ -32,7 +32,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import Room
-from .const import DOMAIN, ROOM_DEVICE_NAME, UNIT_DEVICE_NAME
+from .const import DEVICE_TYPE, DOMAIN, ROOM_DEVICE_NAME, UNIT_DEVICE_NAME
 from .coordinator import (
     Healthbox3ConfigEntry,
     Healthbox3DataUpdateCoordinator,
@@ -113,6 +113,62 @@ def async_setup_rooms(
     entry.async_on_unload(coordinator.async_add_listener(_add_new_rooms))
 
 
+def async_setup_when(
+    entry: Healthbox3ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+    ready: Callable[[Healthbox3DataUpdateCoordinator], bool],
+    build: Callable[[], Iterable[Entity]],
+) -> None:
+    """Add `build()`'s entities the first time `ready` holds - now, or later.
+
+    For entities whose existence depends on something the device says
+    rather than on something this integration configures: whether the
+    unit is on Wi-Fi at all, for instance, which is read from
+    `/renson_core/v2/global` and therefore simply unknown if that
+    endpoint happens to fail on the poll that set the platform up.
+
+    Deciding once, at setup, would turn one unlucky poll into entities
+    missing until somebody thinks to reload the integration - with
+    nothing anywhere saying that a reload is what's needed. So an
+    undecided answer stays undecided and is asked again on the next poll,
+    the same way `async_setup_rooms` treats a room that appears later.
+
+    Entities are added exactly once. The listener is dropped as soon as
+    they are, so this costs nothing on every subsequent poll; if the
+    answer is "no", it keeps waiting, since the device is free to change
+    its mind.
+    """
+    coordinator = entry.runtime_data
+
+    if ready(coordinator):
+        async_add_entities(build())
+        return
+
+    unsub: Callable[[], None] | None = None
+
+    @callback
+    def _unsubscribe() -> None:
+        """Drop the listener, at most once - a coordinator's own remove
+        callback raises if it is called a second time, and this is called
+        both on success below and on unload.
+        """
+        nonlocal unsub
+        if unsub is None:
+            return
+        remove, unsub = unsub, None
+        remove()
+
+    @callback
+    def _add_when_ready() -> None:
+        if not ready(coordinator):
+            return
+        _unsubscribe()
+        async_add_entities(build())
+
+    unsub = coordinator.async_add_listener(_add_when_ready)
+    entry.async_on_unload(_unsubscribe)
+
+
 def unit_device_info(
     coordinator: Healthbox3DataUpdateCoordinator, serial: str
 ) -> DeviceInfo:
@@ -122,19 +178,32 @@ def unit_device_info(
     any platform, so that its registry id exists for the rooms to point
     at - see _room_device below.
 
-    `connections` and `configuration_url` are filled in from
+    `connections`, `configuration_url` and `sw_version` are filled in from
     `/renson_core/v2/global` when it answers. The MAC is what lets Home
     Assistant recognise this unit again after it moves to another
     address; the URL turns the device page into a way into the unit's own
-    web interface. Both are omitted rather than guessed when the endpoint
-    is unavailable - it needs an active API key, so a v1-only install
-    simply doesn't get them.
+    web interface; the firmware version is what Home Assistant shows in
+    the device header and carries into a diagnostics download. All three
+    are omitted rather than guessed when the endpoint is unavailable - it
+    needs an active API key, so a v1-only install simply doesn't get them.
+
+    The firmware version belongs here rather than on an entity of its
+    own: it describes the device, changes only when the device is
+    updated, and Home Assistant already has a place for it. Up to 0.3.x
+    this integration also published it - along with the IP and the MAC -
+    as three diagnostic sensors, which said the same thing twice.
+
+    `model_id` is the device's own product identifier, the string it uses
+    for itself everywhere in its API (`device_type` in the package list,
+    the product segment of the update endpoints). `model` stays the
+    human-readable "Healthbox 3.0" it has always been.
     """
     info = coordinator.data.global_info
     device = DeviceInfo(
         identifiers={(DOMAIN, serial)},
         manufacturer="Renson",
         model="Healthbox 3.0",
+        model_id=DEVICE_TYPE,
         name=UNIT_DEVICE_NAME,
         serial_number=serial,
     )
@@ -144,6 +213,7 @@ def unit_device_info(
         device["connections"] = {(CONNECTION_NETWORK_MAC, format_mac(info.mac))}
     if info.ip:
         device["configuration_url"] = f"http://{info.ip}"
+    device["sw_version"] = info.firmware_version
     return device
 
 

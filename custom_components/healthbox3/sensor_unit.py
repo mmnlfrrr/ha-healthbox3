@@ -39,7 +39,6 @@ from homeassistant.const import (
 from .api import (
     AQI_QUALIFICATION_LEVELS,
     DeviceTelemetry,
-    GlobalInfo,
     Sensor,
     as_float,
     categorize_aqi_quality,
@@ -318,26 +317,35 @@ class Healthbox3GlobalVentilationLevelSensor(Healthbox3Entity, SensorEntity):
         return decision.global_ventilation_level if decision is not None else None
 
 
-class _Healthbox3GlobalSensor(Healthbox3Entity, SensorEntity):
-    """Base for unit-level sensors reading one field of `/renson_core/v2/global`.
+class Healthbox3ConnectionTypeSensor(Healthbox3Entity, SensorEntity):
+    """How the device is attached to the network ("WIFI"/"ETHERNET").
 
-    All diagnostics, all plain strings, all unavailable together when the
-    endpoint can't be reached - so subclasses only declare which field
-    they are.
+    The one field of `/renson_core/v2/global` still published as an
+    entity. Its neighbours up to 0.3.x - firmware version, IP address,
+    MAC address - are gone: Home Assistant puts all three on the device
+    entry itself (`sw_version`, `configuration_url`, `connections`, see
+    entity.py's `unit_device_info`), and an entity repeating what the
+    device page already shows is a row to scroll past, not information.
+
+    This one has nowhere else to go, and it is what makes the rest of the
+    network picture readable: it is the answer to "is this unit on a
+    cable", which decides whether its Wi-Fi entities exist at all (see
+    `wifi_reported` in coordinator.py).
+
+    Reported in the device's own spelling - the observed values are
+    uppercase, but nothing documents the full set, and a value this
+    client has never seen would have no honest translation.
     """
 
+    _attr_translation_key = "connection_type"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _unique_id_suffix: str
 
     def __init__(
         self, coordinator: Healthbox3DataUpdateCoordinator, serial: str
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, serial)
-        self._attr_unique_id = f"{serial}_{self._unique_id_suffix}"
-
-    def _global_value(self, info: GlobalInfo) -> str | None:
-        raise NotImplementedError
+        self._attr_unique_id = f"{serial}_connection_type"
 
     @property
     @override
@@ -348,84 +356,9 @@ class _Healthbox3GlobalSensor(Healthbox3Entity, SensorEntity):
     @property
     @override
     def native_value(self) -> str | None:
-        """Return this sensor's field, if the device reported it."""
+        """Return the reported interface type, if the device reported one."""
         info = self.coordinator.data.global_info
-        return self._global_value(info) if info is not None else None
-
-
-class Healthbox3FirmwareVersionSensor(_Healthbox3GlobalSensor):
-    """The device's currently installed firmware version.
-
-    Diagnostic rather than a primary measurement: this exists to give a
-    concrete, glanceable signal that a firmware update happened, since
-    several assumptions elsewhere in this client are only confirmed
-    against one specific firmware version (the room profile index's
-    encoding, the DHCP hostname pattern) and could plausibly change again
-    on a future update without any error - see RoomDecision's docstring
-    in api.py and async_step_dhcp's docstring in config_flow.py.
-    """
-
-    _attr_translation_key = "firmware_version"
-    _unique_id_suffix = "firmware_version"
-
-    @override
-    def _global_value(self, info: GlobalInfo) -> str | None:
-        return info.firmware_version
-
-
-class Healthbox3IpAddressSensor(_Healthbox3GlobalSensor):
-    """The device's current IP address on the local network.
-
-    Read from the device rather than echoed back from the config entry:
-    the entry holds whatever host was configured, which is what this
-    integration talks to, while this is what the unit believes it is. On
-    a device that moved, those differ - and the difference is the useful
-    part.
-    """
-
-    _attr_translation_key = "ip_address"
-    _unique_id_suffix = "ip_address"
-
-    @override
-    def _global_value(self, info: GlobalInfo) -> str | None:
-        return info.ip
-
-
-class Healthbox3MacAddressSensor(_Healthbox3GlobalSensor):
-    """The device's MAC address.
-
-    Also attached to the device entry as a network connection (see
-    entity.py), which is what lets Home Assistant recognise the same unit
-    across an address change. This entity is for reading it off a
-    dashboard without digging into device settings.
-    """
-
-    _attr_translation_key = "mac_address"
-    _unique_id_suffix = "mac_address"
-
-    @override
-    def _global_value(self, info: GlobalInfo) -> str | None:
-        return info.mac
-
-
-class Healthbox3ConnectionTypeSensor(_Healthbox3GlobalSensor):
-    """How the device is attached to the network ("WIFI"/"ETHERNET").
-
-    Worth having next to `Wi-Fi status`, which answers "not connected" on
-    a wired unit: correct, but it reads like a fault until you know the
-    unit is on a cable. This says which case you are in.
-
-    Reported in the device's own spelling - the observed values are
-    uppercase, but nothing documents the full set, and a value this
-    client has never seen would have no honest translation.
-    """
-
-    _attr_translation_key = "connection_type"
-    _unique_id_suffix = "connection_type"
-
-    @override
-    def _global_value(self, info: GlobalInfo) -> str | None:
-        return info.interface_type
+        return info.interface_type if info is not None else None
 
 
 class Healthbox3DeviceErrorsSensor(Healthbox3Entity, SensorEntity):

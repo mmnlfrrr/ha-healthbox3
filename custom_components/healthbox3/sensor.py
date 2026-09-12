@@ -15,8 +15,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import SENSOR_TYPE_GLOBAL_AQI
-from .coordinator import Healthbox3ConfigEntry
-from .entity import Healthbox3Entity, async_setup_rooms
+from .coordinator import Healthbox3ConfigEntry, wifi_reported
+from .entity import Healthbox3Entity, async_setup_rooms, async_setup_when
 from .sensor_room import _room_sensors
 from .sensor_unit import (
     DEVICE_SENSOR_META,
@@ -24,12 +24,9 @@ from .sensor_unit import (
     Healthbox3DeviceErrorsSensor,
     Healthbox3DeviceSensor,
     Healthbox3EnergySensor,
-    Healthbox3FirmwareVersionSensor,
     Healthbox3GlobalAqiLevelSensor,
     Healthbox3GlobalAqiSensor,
     Healthbox3GlobalVentilationLevelSensor,
-    Healthbox3IpAddressSensor,
-    Healthbox3MacAddressSensor,
     Healthbox3WifiStatusSensor,
 )
 
@@ -55,11 +52,7 @@ async def async_setup_entry(
         entities.append(Healthbox3GlobalAqiLevelSensor(coordinator, serial))
 
     if coordinator.use_v2:
-        entities.append(Healthbox3WifiStatusSensor(coordinator, serial))
         entities.append(Healthbox3GlobalVentilationLevelSensor(coordinator, serial))
-        entities.append(Healthbox3FirmwareVersionSensor(coordinator, serial))
-        entities.append(Healthbox3IpAddressSensor(coordinator, serial))
-        entities.append(Healthbox3MacAddressSensor(coordinator, serial))
         entities.append(Healthbox3ConnectionTypeSensor(coordinator, serial))
         entities.append(Healthbox3DeviceErrorsSensor(coordinator, serial))
         entities.append(Healthbox3EnergySensor(coordinator, serial))
@@ -69,6 +62,18 @@ async def async_setup_entry(
         )
 
     async_add_entities(entities)
+
+    if coordinator.use_v2:
+        # Only on a unit that isn't wired - see wifi_reported. Added
+        # through async_setup_when rather than in the list above because
+        # the answer comes from the device and may not be in yet.
+        async_setup_when(
+            entry,
+            async_add_entities,
+            wifi_reported,
+            lambda: [Healthbox3WifiStatusSensor(coordinator, serial)],
+        )
+
     async_setup_rooms(
         entry,
         async_add_entities,

@@ -48,9 +48,10 @@ taking that on, please open a GitHub issue to discuss it.
 - A per-room airflow sensor, showing current airflow as a percentage of
   that room's rated (nominal) flow - not capped at 100%, since boost can
   push it well past nominal.
-- A diagnostic firmware version sensor - a concrete signal that a
-  firmware update happened, worth checking if anything undocumented
-  starts behaving differently. Only available with an activated API key.
+- The unit's firmware version, MAC address and web interface on its own
+  device page, where Home Assistant shows a device's identity - the
+  firmware version being worth checking if anything undocumented starts
+  behaving differently. Only available with an activated API key.
 - Device-reported error/fault surfacing - each error the Healthbox itself
   reports (e.g. a sensor fault) creates a Home Assistant repair issue
   (**Settings > Repairs**) so it's not something you'd only notice by
@@ -225,10 +226,7 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `Air quality index` | Whole-house AQI; exposes `main_pollutant`, `room`, and a `qualification` band (see [Known limitations](#known-limitations)) |
 | `sensor` | `AQI level` | That same whole-house qualification band as its own state, for dashboards - created alongside `Air quality index` |
 | `sensor` | `Ventilation level` | Whole-house current ventilation level, as a percentage; not capped at 100% - requires an active API key |
-| `sensor` | `Firmware version` | The device's currently installed firmware version - diagnostic entity, requires an active API key |
-| `sensor` | `IP address` | The address the device reports for itself - diagnostic entity, requires an active API key |
-| `sensor` | `MAC address` | The device's hardware address - diagnostic entity, requires an active API key |
-| `sensor` | `Connection type` | Ethernet or Wi-Fi. Worth having beside `Wi-Fi status`, which answers "not connected" on a unit wired over Ethernet and reads like a fault until you know it is on a cable - diagnostic entity, requires an active API key |
+| `sensor` | `Connection type` | Ethernet or Wi-Fi. This is what decides whether the unit's Wi-Fi entities exist at all - diagnostic entity, requires an active API key |
 | `sensor` | `Device errors` | Count of currently-active device-reported errors, plus the most recent one's details as attributes - diagnostic entity, requires an active API key; each active error also creates a repair issue (**Settings > Repairs**) |
 | `sensor` | `Power` | Whole-device electrical power draw - requires an active API key |
 | `sensor` | `Energy` | Cumulative kWh, integrated from `Power` - feeds the Energy dashboard directly, requires an active API key; see [Energy dashboard](#energy-dashboard) |
@@ -248,10 +246,10 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `<room> Valve port` | Which collector port on the unit that room's valve is wired to - the number printed next to the port, and what the [dashboard card](#dashboard-card) places rooms by - diagnostic entity |
 | `sensor` | `<room> Legislation code` | The regulatory code the installer assigned to that outlet (C16, C22...). Which codes exist depends on the country, so the raw value is shown as-is - diagnostic entity |
 | `sensor` | `<room> Room symbol` | The pictogram Renson's own app uses for that room, drawn with Renson's own icon - diagnostic entity |
-| `sensor` | `Wi-Fi status` | The device's Wi-Fi client status, with SSID as an attribute - diagnostic entity, requires an active API key |
+| `sensor` | `Wi-Fi status` | The device's Wi-Fi client status, with SSID as an attribute. **Not created on a unit attached over Ethernet**, where it could only ever report an idle radio - diagnostic entity, requires an active API key |
 | `binary_sensor` | `Problem` | On while the device reports any error - the boolean companion to `Device errors`, requires an active API key |
 | `binary_sensor` | `Advanced API access` | Whether privileged (v2) access is currently working - diagnostic entity, always created |
-| `binary_sensor` | `Internet connection` | Whether the device reports internet access. **Only created on a unit attached over Wi-Fi**: the figure comes from the Wi-Fi client's own status, which says nothing about an Ethernet cable - `Connection type` answers for a wired unit instead. Diagnostic entity, requires an active API key |
+| `binary_sensor` | `Internet connection` | Whether the device reports internet access. **Not created on a unit attached over Ethernet**: the figure comes from the Wi-Fi client's own status, which says nothing about a cable - `Connection type` answers for a wired unit instead. Diagnostic entity, requires an active API key |
 | `select` | `<room> Profile` | eco/health/intense - only created with an active API key |
 | `fan` | `<room> Boost` | Boost for that room - see "Boost control" below |
 | `fan` | `Boost all` | Boost for every room at once, at one shared level/duration - on only when every room currently reports boost enabled |
@@ -504,7 +502,9 @@ Pick a shorter one knowingly: a poll is not one request. `data/current`
 goes first, since it's the call that decides whether this is a v1 or a v2
 poll and which rooms exist; then the rest go out together - the decision
 tree, device errors, fan/duct telemetry and Wi-Fi status. **Five requests
-per poll**, whatever the room count, against a small embedded unit.
+per poll**, whatever the room count, against a small embedded unit - and
+**four** on a unit attached over Ethernet, which is never asked about its
+Wi-Fi after the first poll has established that it has none.
 
 It used to be seven plus one per room - fourteen on a seven-room
 installation - because boost was read one room at a time and the decision
@@ -718,8 +718,9 @@ their boost status. This fork also reads `/v1/device` and
 `Energy` sensor wired straight into the Energy dashboard, fan speed,
 voltage and pressures, the device's own calibrated duct model (per-room
 valve pressure and conductance, network leakage), absolute airflow in
-m³/h beside the existing percentage, Wi-Fi status, IP/MAC/connection
-type, and each room's valve port, regulatory code and Renson pictogram.
+m³/h beside the existing percentage, Wi-Fi status, connection type, the
+firmware version and MAC on the device entry itself, and each room's
+valve port, regulatory code and Renson pictogram.
 
 **Each ventilated room is its own device**, linked to the unit, instead
 of every entity sitting on one. That is what makes areas usable: Home

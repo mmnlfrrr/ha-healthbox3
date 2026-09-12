@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from homeassistant.const import CONF_API_KEY, CONF_HOST, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import Healthbox3ApiClient, Healthbox3ConnectionError, Healthbox3Error
@@ -14,10 +14,16 @@ from .const import DOMAIN
 from .coordinator import (
     Healthbox3ConfigEntry,
     Healthbox3DataUpdateCoordinator,
+    is_wired,
     scan_interval,
 )
 from .entity import unit_device_info
 from .icon_set import async_register as async_register_icon_set
+
+# Unique-id suffixes of the unit sensors dropped in favour of the fields
+# Home Assistant already carries on the device entry itself - see
+# _async_prune_entities.
+_REPLACED_BY_DEVICE = ("firmware_version", "ip_address", "mac_address")
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
@@ -84,6 +90,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -
         **unit_device_info(coordinator, coordinator.data.healthbox.serial),
     ).id
 
+    _async_prune_entities(hass, entry, coordinator)
+
     entry.runtime_data = coordinator
     # The poll interval is read once, when the coordinator is built, so a
     # change to it only takes effect on a reload - which this listener is
@@ -91,6 +99,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+@callback
+def _async_prune_entities(
+    hass: HomeAssistant,
+    entry: Healthbox3ConfigEntry,
+    coordinator: Healthbox3DataUpdateCoordinator,
+) -> None:
+    """Delete registry entries for entities this version no longer creates.
+
+    An entity that stops being created does not go away: its registry
+    entry survives, and Home Assistant shows it as restored and forever
+    unavailable, still in every list, still in every automation picker,
+    with a Delete button that is the user's problem rather than ours. So
+    the ones we removed on purpose are removed properly.
+
+    Two groups, for two different reasons:
+
+    - Firmware version, IP address and MAC address said exactly what the
+      device entry now says (`sw_version`, `configuration_url`,
+      `connections` - see entity.py). Gone for every installation.
+    - Wi-Fi status and Internet connection are gone only on a unit that
+      says it is wired, where they could never answer (see
+      `wifi_reported`). If the device hasn't said, or says it is on
+      Wi-Fi, they stay - and keep their history.
+
+    Deliberately silent about entries that aren't there: on all but the
+    first run after the upgrade, that is all of them.
+    """
+    registry = er.async_get(hass)
+    serial = coordinator.data.healthbox.serial
+
+    obsolete = [(Platform.SENSOR, f"{serial}_{name}") for name in _REPLACED_BY_DEVICE]
+    if is_wired(coordinator.data.global_info):
+        obsolete.append((Platform.SENSOR, f"{serial}_wifi_status"))
+        obsolete.append((Platform.BINARY_SENSOR, f"{serial}_internet_connection"))
+
+    for platform, unique_id in obsolete:
+        entity_id = registry.async_get_entity_id(platform, DOMAIN, unique_id)
+        if entity_id is not None:
+            registry.async_remove(entity_id)
 
 
 async def _async_options_updated(

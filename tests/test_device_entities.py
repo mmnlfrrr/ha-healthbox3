@@ -183,11 +183,14 @@ async def test_room_duct_sensors_not_created_without_a_valve_parameter(
     assert _state(hass, "sensor", stripped.serial, "room1_valve_port") is None
 
 
-async def test_network_sensors_report_global_info(
+async def test_connection_type_sensor_reports_global_info(
     hass, mock_api_client, v2_data, boost_status, firmware_version
 ):
-    """IP, MAC and connection type all come from the one /renson_core/v2/global
-    fetch the firmware version already used.
+    """The one field of /renson_core/v2/global still published as an entity.
+
+    Its neighbours up to 0.3.x - firmware version, IP, MAC - are on the
+    device entry instead (see the device tests below); this one has
+    nowhere else to go.
     """
     await setup_integration(
         hass,
@@ -198,21 +201,18 @@ async def test_network_sensors_report_global_info(
         firmware_version=firmware_version,
     )
 
-    assert _state(hass, "sensor", v2_data.serial, "ip_address").state == "192.0.2.1"
-    assert (
-        _state(hass, "sensor", v2_data.serial, "mac_address").state
-        == "64:1c:10:00:00:01"
-    )
     assert (
         _state(hass, "sensor", v2_data.serial, "connection_type").state == "ETHERNET"
     )
+    for gone in ("firmware_version", "ip_address", "mac_address"):
+        assert _state(hass, "sensor", v2_data.serial, gone) is None
 
 
-async def test_network_sensors_unavailable_when_global_fetch_failed(
+async def test_connection_type_unavailable_when_global_fetch_failed(
     hass, mock_api_client, v2_data, boost_status, firmware_version
 ):
     """The endpoint needs an API key and can fail on its own; when it does
-    these go unavailable rather than reporting a stale address.
+    this goes unavailable rather than reporting a stale answer.
     """
     entry = await setup_integration(
         hass,
@@ -228,16 +228,22 @@ async def test_network_sensors_unavailable_when_global_fetch_failed(
     coordinator.async_update_listeners()
     await hass.async_block_till_done()
 
-    for suffix in ("ip_address", "mac_address", "connection_type"):
-        assert _state(hass, "sensor", v2_data.serial, suffix).state == "unavailable"
+    assert (
+        _state(hass, "sensor", v2_data.serial, "connection_type").state == "unavailable"
+    )
 
 
-async def test_unit_device_carries_mac_connection_and_configuration_url(
+async def test_unit_device_carries_the_whole_global_read(
     hass, mock_api_client, v2_data, boost_status, firmware_version
 ):
-    """The MAC is what lets Home Assistant recognise the unit across an
-    address change, and the URL turns the device page into a way into the
-    unit's own web interface.
+    """Everything /renson_core/v2/global says about the unit's identity
+    lands on the device entry, which is where Home Assistant shows it.
+
+    The MAC is what lets it recognise the unit across an address change,
+    the URL turns the device page into a way into the unit's own web
+    interface, and the firmware version shows in the device header - each
+    of the last two replacing a diagnostic sensor that said the same
+    thing.
     """
     entry = await setup_integration(
         hass,
@@ -252,6 +258,8 @@ async def test_unit_device_carries_mac_connection_and_configuration_url(
     assert device is not None
     assert (dr.CONNECTION_NETWORK_MAC, "64:1c:10:00:00:01") in device.connections
     assert device.configuration_url == "http://192.0.2.1"
+    assert device.sw_version == "2.6.9"
+    assert device.model_id == "HEALTHBOX3"
 
 
 async def test_unit_device_omits_network_details_without_global_info(
@@ -259,6 +267,10 @@ async def test_unit_device_omits_network_details_without_global_info(
 ):
     """A v1-only install can't reach the endpoint at all, so the device
     entry goes without rather than carrying a guess.
+
+    `model_id` is the exception: it is the device's own name for the
+    product, known from the integration being what it is, not read off
+    the device.
     """
     entry = await setup_integration(
         hass,
@@ -273,6 +285,8 @@ async def test_unit_device_omits_network_details_without_global_info(
     assert device is not None
     assert device.connections == set()
     assert device.configuration_url is None
+    assert device.sw_version is None
+    assert device.model_id == "HEALTHBOX3"
 
 
 async def test_room_symbol_prefers_the_device_icon_over_the_room_type(
@@ -423,7 +437,7 @@ async def test_valve_port_sensor_does_not_need_the_duct_model(
 
 
 async def test_wifi_status_sensor_reports_state_and_ssid_attribute(
-    hass, mock_api_client, v2_data, boost_status, wifi_status
+    hass, mock_api_client, v2_data, boost_status, wifi_status, firmware_version
 ):
     await setup_integration(
         hass,
@@ -431,6 +445,8 @@ async def test_wifi_status_sensor_reports_state_and_ssid_attribute(
         serial=v2_data.serial,
         healthbox_data=v2_data,
         boost_status=boost_status,
+        firmware_version=firmware_version,
+        interface_type="WIFI",
         wifi=wifi_status,
     )
 
@@ -465,16 +481,17 @@ async def test_problem_binary_sensor_follows_the_error_list(
     assert _state(hass, "binary_sensor", v2_data.serial, "device_problem").state == "off"
 
 
-async def test_internet_is_not_reported_when_the_interface_is_unknown(
+async def test_internet_waits_while_the_interface_is_unknown(
     hass, mock_api_client, v2_data, boost_status, wifi_status
 ):
     """Without `/renson_core/v2/global` there is no way to tell whether the
     Wi-Fi endpoint describes how this unit is attached or an idle radio.
 
     Reporting its answer anyway is what produced a "Disconnected" reading
-    on a wired unit, so the entity is not created at all rather than left
-    permanently unavailable - which would sit in every list and every
-    search result inviting the question of what broke.
+    on a wired unit, so the entity is not created - which would sit in
+    every list and every search result inviting the question of what
+    broke. Not decided, though, rather than decided against: the endpoint
+    is never asked in this test, so nothing ever settles it.
     """
     await setup_integration(
         hass,
@@ -486,6 +503,46 @@ async def test_internet_is_not_reported_when_the_interface_is_unknown(
     )
 
     assert _state(hass, "binary_sensor", v2_data.serial, "internet_connection") is None
+
+
+async def test_wifi_entities_appear_once_the_device_answers(
+    hass, mock_api_client, v2_data, boost_status, firmware_version, wifi_status
+):
+    """An unlucky first poll must not cost a Wi-Fi unit its entities.
+
+    `/renson_core/v2/global` needs an API key and can fail on its own. If
+    it fails on the poll that sets the platforms up, whether this unit is
+    wired is simply unknown - and deciding "no entity" on that would hide
+    them until somebody thought to reload the integration, with nothing
+    anywhere saying a reload was what was needed.
+    """
+    mock_api_client.async_get_global = AsyncMock(
+        side_effect=api_mod.Healthbox3Error("boom")
+    )
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        wifi=wifi_status,
+    )
+
+    assert _state(hass, "binary_sensor", v2_data.serial, "internet_connection") is None
+    assert _state(hass, "sensor", v2_data.serial, "wifi_status") is None
+
+    mock_api_client.async_get_global = AsyncMock(
+        return_value=api_mod.GlobalInfo(
+            firmware_version=firmware_version, interface_type="WIFI"
+        )
+    )
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    assert (
+        _state(hass, "binary_sensor", v2_data.serial, "internet_connection") is not None
+    )
+    assert _state(hass, "sensor", v2_data.serial, "wifi_status") is not None
 
 
 async def test_advanced_api_binary_sensor_exists_without_a_key(
@@ -890,7 +947,8 @@ async def test_internet_is_not_reported_on_a_wired_unit(
     access it was denying.
 
     An entity that could never hold a meaningful value is not created at
-    all; `Connection type` answers for a wired unit instead.
+    all - neither this one nor the `Wi-Fi status` sensor beside it;
+    `Connection type` answers for a wired unit instead.
     """
     mock_api_client.async_get_global = AsyncMock(
         return_value=api_mod.GlobalInfo(
@@ -911,6 +969,7 @@ async def test_internet_is_not_reported_on_a_wired_unit(
     )
 
     assert _state(hass, "binary_sensor", v2_data.serial, "internet_connection") is None
+    assert _state(hass, "sensor", v2_data.serial, "wifi_status") is None
 
     # The sensor that does answer for a wired unit is there instead.
     connection = _state(hass, "sensor", v2_data.serial, "connection_type")

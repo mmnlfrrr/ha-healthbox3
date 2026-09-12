@@ -219,9 +219,18 @@ async def test_global_ventilation_level_sensor_unavailable_when_decision_fetch_f
     assert hass.states.get(f"sensor.{_PREFIX}_ventilation_level").state == "unavailable"
 
 
-async def test_firmware_version_sensor_reports_state(
+async def test_no_entity_repeats_what_the_device_entry_says(
     hass, mock_api_client, v2_data, boost_status, firmware_version
 ):
+    """Firmware version, IP and MAC were three diagnostic sensors up to
+    0.3.x. Home Assistant carries all three on the device entry itself
+    (`sw_version`, `configuration_url`, `connections`), so the sensors
+    said the same thing a second time, one row each, in every list.
+
+    They are asserted absent by entity id rather than by unique id
+    because that is how a user would look for them - and because a
+    leftover registry entry would answer to exactly this id.
+    """
     await setup_integration(
         hass,
         mock_api_client,
@@ -231,44 +240,8 @@ async def test_firmware_version_sensor_reports_state(
         firmware_version=firmware_version,
     )
 
-    state = hass.states.get(f"sensor.{_PREFIX}_firmware_version")
-    assert state is not None
-    assert state.state == "2.6.9"
-
-
-async def test_firmware_version_sensor_not_created_without_api_key(
-    hass, mock_api_client, v1_data, boost_status
-):
-    await setup_integration(
-        hass,
-        mock_api_client,
-        serial=v1_data.serial,
-        api_key=None,
-        healthbox_data=v1_data,
-        boost_status=boost_status,
-    )
-
-    assert hass.states.get(f"sensor.{_PREFIX}_firmware_version") is None
-
-
-async def test_firmware_version_sensor_unavailable_when_fetch_failed(
-    hass, mock_api_client, v2_data, boost_status, firmware_version
-):
-    entry = await setup_integration(
-        hass,
-        mock_api_client,
-        serial=v2_data.serial,
-        healthbox_data=v2_data,
-        boost_status=boost_status,
-        firmware_version=firmware_version,
-    )
-    coordinator = entry.runtime_data
-
-    coordinator.data.global_info = None
-    coordinator.async_update_listeners()
-    await hass.async_block_till_done()
-
-    assert hass.states.get(f"sensor.{_PREFIX}_firmware_version").state == "unavailable"
+    for gone in ("firmware_version", "ip_address", "mac_address"):
+        assert hass.states.get(f"sensor.{_PREFIX}_{gone}") is None
 
 
 async def test_device_errors_sensor_reports_count(

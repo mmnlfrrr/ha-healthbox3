@@ -179,6 +179,12 @@ API_RENSON_CORE_V1_WIFI_STATUS = "/renson_core/v1/wifi/client/status"
 # unit is actually attached to the network, or an idle radio.
 INTERFACE_TYPE_WIFI = "WIFI"
 
+# The product identifier the device uses for itself throughout its own
+# API - `device_type` on every entry of `/renson_core/v1/packages`, and
+# the product segment of Renson's update endpoints. Published as the
+# device entry's `model_id`, next to the human-readable `model`.
+DEVICE_TYPE = "HEALTHBOX3"
+
 # /v1/device keys its per-valve conductance and pressure blocks by the
 # collector PORT number, not by room id - this room parameter is the join
 # key between the two endpoints. Reported as a string on the wire (e.g.

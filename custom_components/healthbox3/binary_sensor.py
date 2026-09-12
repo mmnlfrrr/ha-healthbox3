@@ -27,9 +27,12 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import INTERFACE_TYPE_WIFI
-from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
-from .entity import Healthbox3Entity
+from .coordinator import (
+    Healthbox3ConfigEntry,
+    Healthbox3DataUpdateCoordinator,
+    wifi_reported,
+)
+from .entity import Healthbox3Entity, async_setup_when
 
 # Entities only read from the coordinator; see sensor.py.
 PARALLEL_UPDATES = 0
@@ -53,21 +56,20 @@ async def async_setup_entry(
 
     if coordinator.use_v2:
         entities.append(Healthbox3ProblemBinarySensor(coordinator, serial))
-        # Only on a unit actually attached over Wi-Fi. The reading comes
-        # from the Wi-Fi client's own status, which says nothing about an
-        # Ethernet cable, so on a wired unit the entity could never hold a
-        # meaningful value - and an entity that can never answer is worse
-        # than no entity: it sits in every list and every search result
-        # reading "unavailable", inviting the question of what broke.
-        #
-        # Read once, at setup: a unit does not move between a cable and a
-        # radio while running, and the one thing that does it - somebody
-        # rewiring it - is a reload anyway.
-        info = coordinator.data.global_info
-        if info is not None and (info.interface_type or "").upper() == INTERFACE_TYPE_WIFI:
-            entities.append(Healthbox3InternetBinarySensor(coordinator, serial))
 
     async_add_entities(entities)
+
+    if coordinator.use_v2:
+        # Only on a unit that isn't wired. The reading comes from the
+        # Wi-Fi client's own status, which says nothing about an Ethernet
+        # cable - see wifi_reported, and async_setup_when for why this is
+        # not simply decided here and now.
+        async_setup_when(
+            entry,
+            async_add_entities,
+            wifi_reported,
+            lambda: [Healthbox3InternetBinarySensor(coordinator, serial)],
+        )
 
 
 class Healthbox3ProblemBinarySensor(Healthbox3Entity, BinarySensorEntity):

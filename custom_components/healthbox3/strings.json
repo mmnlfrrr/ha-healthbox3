@@ -150,15 +150,6 @@
       "global_ventilation_level": {
         "name": "Ventilation level"
       },
-      "firmware_version": {
-        "name": "Firmware version"
-      },
-      "ip_address": {
-        "name": "IP address"
-      },
-      "mac_address": {
-        "name": "MAC address"
-      },
       "connection_type": {
         "name": "Connection type"
       },

@@ -24,7 +24,9 @@ rules:
     #
     # /renson_core/v2/global is re-read every GLOBAL_INFO_REFRESH_EVERY
     # polls rather than every one - firmware version, MAC and IP do not
-    # change between two polls.
+    # change between two polls - and a unit that reports itself wired is
+    # not asked about its Wi-Fi at all after the first poll, which brings
+    # it to four.
   brands: done
     # Local brand images in custom_components/healthbox3/brand/ (icon.png,
     # icon@2x.png, logo.png, logo@2x.png) - since HA 2026.3.0, custom
@@ -226,7 +228,7 @@ rules:
     # threshold/silent reduction numbers, and silent start/stop times are
     # all device *configuration* (how the device behaves, not something
     # to look at or act on day to day), so those all get
-    # EntityCategory.CONFIG. The firmware version and device errors
+    # EntityCategory.CONFIG. The connection type and device errors
     # sensors are both EntityCategory.DIAGNOSTIC - textbook diagnostic
     # info, neither a primary measurement nor a control.
   entity-device-class: done
@@ -252,12 +254,17 @@ rules:
     # "enable this entity" step - none are high-frequency, noisy, or
     # genuinely optional in a way that would justify defaulting them off.
     #
-    # The firmware version sensor (EntityCategory.DIAGNOSTIC) is also left
-    # enabled by default, for the same class of reason as airflow: its
-    # whole purpose is to be a glanceable signal that a firmware update
-    # happened, since several assumptions elsewhere in this client are
-    # only confirmed against one firmware version - a user shouldn't need
-    # to already know to look for that signal to have it available.
+    # The connection type sensor (EntityCategory.DIAGNOSTIC) is also left
+    # enabled by default, for the same class of reason as airflow: it is
+    # what explains why a wired unit has no Wi-Fi entities, and a user
+    # shouldn't need to already know to look for that answer to have it
+    # available.
+    #
+    # Nothing here is disabled by default in order to hide a duplicate
+    # either: the three sensors that used to repeat the device entry's
+    # own firmware version, IP and MAC were removed outright rather than
+    # defaulted off, since an entity worth having is worth enabling and
+    # one saying what the device page says is neither.
     #
     # The device errors sensor (EntityCategory.DIAGNOSTIC) is also left
     # enabled by default: it complements, not duplicates, the repair

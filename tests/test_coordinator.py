@@ -40,6 +40,12 @@ def _client() -> AsyncMock:
     client.async_get_decision_tree.side_effect = api_mod.Healthbox3ConnectionError(
         "no decision tree configured in this test"
     )
+    # Same quirk, for the same reason as the conftest fixture: left
+    # unconfigured this answers with a mock, which the coordinator stores
+    # as real device identity and then reads `interface_type` off to
+    # decide whether to poll the Wi-Fi endpoint - a comparison against a
+    # mock, never against a real answer.
+    client.async_get_global.return_value = None
     return client
 
 
@@ -849,3 +855,66 @@ async def test_one_rooms_missing_boost_does_not_trigger_the_fallback(
 
     assert set(coordinator.data.boost) == {1, 2, 4, 5, 6, 7}
     client.async_get_boost.assert_not_called()
+
+
+async def test_a_wired_unit_stops_being_asked_about_its_wifi(
+    hass, mock_api_client, v2_data, boost_status, device_decision
+):
+    """One request in five, every poll, for an answer already known.
+
+    A unit on Ethernet answers the Wi-Fi endpoint with an idle radio,
+    forever, and nothing reads it - the entities built on it are not
+    created on such a unit. The first poll still asks, because how the
+    device is attached is only learned from the global read running
+    alongside it; from the second on, it doesn't.
+    """
+    _wire_full_poll(
+        mock_api_client,
+        v2_data=v2_data,
+        boost_status=boost_status,
+        decision=device_decision,
+    )
+    mock_api_client.async_get_global = AsyncMock(
+        return_value=api_mod.GlobalInfo(
+            firmware_version="2.6.9", interface_type="ETHERNET"
+        )
+    )
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    coordinator = Healthbox3DataUpdateCoordinator(
+        hass, entry, mock_api_client, use_v2=True
+    )
+
+    await coordinator.async_refresh()
+    assert mock_api_client.async_get_wifi_status.call_count == 1
+
+    await coordinator.async_refresh()
+    await coordinator.async_refresh()
+    assert mock_api_client.async_get_wifi_status.call_count == 1
+
+
+async def test_a_unit_that_has_not_said_is_still_asked(
+    hass, mock_api_client, v2_data, boost_status, device_decision
+):
+    """Unknown is not wired.
+
+    A device that never reports `IFTYPE` - an older firmware, or one
+    whose global read keeps failing - keeps being polled exactly as
+    before. Only an explicit "ETHERNET" stops the question.
+    """
+    _wire_full_poll(
+        mock_api_client,
+        v2_data=v2_data,
+        boost_status=boost_status,
+        decision=device_decision,
+    )
+    mock_api_client.async_get_global = AsyncMock(
+        return_value=api_mod.GlobalInfo(firmware_version="2.6.9")
+    )
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    coordinator = Healthbox3DataUpdateCoordinator(
+        hass, entry, mock_api_client, use_v2=True
+    )
+
+    await coordinator.async_refresh()
+    await coordinator.async_refresh()
+    assert mock_api_client.async_get_wifi_status.call_count == 2

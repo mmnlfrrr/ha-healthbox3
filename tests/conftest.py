@@ -318,10 +318,12 @@ async def setup_integration(
     breeze: api_mod.BreezeSettings | None = None,
     room_decisions: dict[int, api_mod.RoomDecision] | None = None,
     firmware_version: str | None = None,
+    interface_type: str = "ETHERNET",
     errors: list[api_mod.DeviceError] | None = None,
     device: api_mod.DeviceTelemetry | None = None,
     wifi: api_mod.WifiStatus | None = None,
     title: str | None = None,
+    entry: MockConfigEntry | None = None,
 ) -> MockConfigEntry:
     """Create a config entry and run async_setup_entry against a mocked client.
 
@@ -332,8 +334,13 @@ async def setup_integration(
     access) is independent of `api_key` (whether *this config entry* has a
     key on file). Defaults to matching `api_key` when not given, to cover
     the common case of "the entry's own key is/isn't valid".
+
+    `entry` takes an already-registered entry instead of making one, for
+    a test that has to put something in place against it - registry
+    entries, say - before setup runs.
     """
-    entry = make_config_entry(hass, serial=serial, api_key=api_key, title=title)
+    if entry is None:
+        entry = make_config_entry(hass, serial=serial, api_key=api_key, title=title)
 
     effective_valid = bool(api_key) if api_key_valid is None else api_key_valid
     mock_api_client.async_get_api_key_status.return_value = api_mod.ApiKeyStatus(
@@ -391,13 +398,17 @@ async def setup_integration(
         )
 
     mock_api_client.async_get_decision_tree = AsyncMock(side_effect=_decision_tree)
+    # `interface_type` decides whether this unit's Wi-Fi entities exist at
+    # all, and whether its Wi-Fi endpoint is polled - see `wifi_reported`
+    # in coordinator.py. The fixture device is wired, so that is the
+    # default; a test about the Wi-Fi entities passes "WIFI".
     if firmware_version is not None:
         mock_api_client.async_get_global = AsyncMock(
             return_value=api_mod.GlobalInfo(
                 firmware_version=firmware_version,
                 mac="64:1c:10:00:00:01",
                 ip="192.0.2.1",
-                interface_type="ETHERNET",
+                interface_type=interface_type,
             )
         )
     if errors is not None:

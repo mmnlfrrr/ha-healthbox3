@@ -41,6 +41,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     GLOBAL_INFO_REFRESH_EVERY,
+    INTERFACE_TYPE_WIFI,
     SCAN_INTERVAL_MAX,
     SCAN_INTERVAL_MIN,
 )
@@ -115,6 +116,38 @@ def _clamp_level(level: float | None, maximum: float = BOOST_LEVEL_MAX) -> float
     if level is None:
         return BOOST_FALLBACK_LEVEL
     return max(BOOST_LEVEL_MIN, min(maximum, level))
+
+
+def is_wired(info: GlobalInfo | None) -> bool:
+    """Return whether the device says it is attached by something other than Wi-Fi.
+
+    Deliberately not the negation of "is on Wi-Fi": a unit that has not
+    said yet (`/renson_core/v2/global` unread or unreachable) and one on
+    firmware that does not report `IFTYPE` at all are both *unknown*, not
+    wired. Everything gated on this treats unknown as "carry on as
+    before", so a missing answer never costs a Wi-Fi user anything - only
+    an explicit "ETHERNET" does.
+    """
+    if info is None or not info.interface_type:
+        return False
+    return info.interface_type.upper() != INTERFACE_TYPE_WIFI
+
+
+def wifi_reported(coordinator: Healthbox3DataUpdateCoordinator) -> bool:
+    """Return whether this device's Wi-Fi entities are worth creating.
+
+    True once the device has answered *and* that answer wasn't "I'm on a
+    cable". A wired unit answers the Wi-Fi endpoint with a permanently
+    not-connected radio: correct, and useless - an entity that can never
+    hold a meaningful value still sits in every list and every search
+    result reading "unavailable", inviting the question of what broke.
+
+    Undecided is not "no": see `is_wired`. It stays pending until the
+    device says something, which is why the entities gated on this are
+    added through `async_setup_when` rather than at platform setup.
+    """
+    info = coordinator.data.global_info
+    return info is not None and not is_wired(info)
 
 
 def _clamp_timeout(timeout: int | None) -> int:
@@ -239,12 +272,20 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         """
         healthbox = await self._async_get_healthbox_data()
 
+        # Read here rather than inside the Wi-Fi task: the global read is
+        # one of the tasks below, so asking from inside another of them
+        # would be racing it - the answer would depend on which task the
+        # event loop happened to run first. This is deliberately the
+        # *previous* poll's answer, which is all this needs: how a unit is
+        # attached to the network does not change between two polls.
+        wired = is_wired(self._global_info)
+
         async with asyncio.TaskGroup() as group:
             decision = group.create_task(self._async_get_decision_and_boost(healthbox))
             global_info = group.create_task(self._async_get_global_data())
             errors = group.create_task(self._async_get_errors_data())
             device = group.create_task(self._async_get_device_data())
-            wifi = group.create_task(self._async_get_wifi_data())
+            wifi = group.create_task(self._async_get_wifi_data(wired=wired))
 
         tree, boost = decision.result()
         self._async_reconcile_error_issues(errors.result())
@@ -375,11 +416,21 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             _LOGGER.debug("Failed to fetch device telemetry: %s", err)
             return None
 
-    async def _async_get_wifi_data(self) -> WifiStatus | None:
+    async def _async_get_wifi_data(self, *, wired: bool) -> WifiStatus | None:
         """Fetch `/renson_core/v1/wifi/client/status` - same gating/tolerance
-        as device telemetry above.
+        as device telemetry above, and not at all on a wired unit.
+
+        A unit on Ethernet answers this endpoint every time with an idle
+        radio, forever. Nothing reads it - the entities built on it are
+        not created on such a unit (see `wifi_reported`) - so asking is
+        one request in five, every poll, for an answer already known.
+
+        `wired` is decided by the caller, before the parallel fan-out
+        starts; the first poll of a session has nothing to decide it on
+        and therefore always asks, which is what makes "hasn't said yet"
+        safe - see `is_wired`.
         """
-        if not self.use_v2:
+        if not self.use_v2 or wired:
             return None
         try:
             return await self.client.async_get_wifi_status()

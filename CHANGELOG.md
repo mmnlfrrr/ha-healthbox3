@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The unit's firmware version, and its product id, are on the device
+  entry.** Home Assistant has a place for both - `sw_version`, shown in
+  the device header, and `model_id` beside the model - and this
+  integration was reading the firmware version every poll without ever
+  putting it there. `model_id` is `HEALTHBOX3`, the name the device uses
+  for itself throughout its own API.
+- **A unit wired over Ethernet is no longer asked about its Wi-Fi.** It
+  answers `/renson_core/v1/wifi/client/status` every time with an idle
+  radio, forever, and nothing reads the answer - the entities built on it
+  are not created on such a unit. That was one request in five, every
+  poll, for something already known: **a poll is four requests on a wired
+  unit**, five on any other.
+
+  The first poll of a session still asks, since how the unit is attached
+  is only learned from the global read running alongside it. A unit that
+  has not said - an older firmware that does not report `IFTYPE`, or one
+  whose global read keeps failing - keeps being polled exactly as before:
+  only an explicit `ETHERNET` stops the question.
+- **`Wi-Fi status` is not created on a wired unit either**, for the same
+  reason `Internet connection` no longer is (see Fixed, below): it could
+  only ever report a switched-off radio. On a unit that is on Wi-Fi,
+  nothing changes.
+- **The Wi-Fi entities are no longer decided once, at startup.** Whether
+  a unit is wired is read from `/renson_core/v2/global`, which needs an
+  API key and can fail on its own. If it failed on the poll that set the
+  platforms up, a unit actually on Wi-Fi lost both entities until someone
+  thought to reload the integration - with nothing anywhere saying that a
+  reload was what was needed. An undecided answer now stays undecided and
+  is asked again on the next poll, the same way a room that appears later
+  is picked up.
+
 - **Devices are named `Healthbox - Global` and `Healthbox - <room>`.** The unit
   used to take the name the device gives itself, which reads "Healthbox
   3.0" and so repeated the model field verbatim; each room took its bare
@@ -135,6 +166,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads its label as a string from the cloud rather than deriving it from
   a number, so it has no thresholds of its own to adopt. Band *states* are
   unchanged keys, so history and automations are unaffected.
+
+### Removed
+
+- **The `Firmware version`, `IP address` and `MAC address` sensors.**
+  All three repeated what Home Assistant already carries on the device
+  entry itself - the firmware version and the MAC now literally so (see
+  Changed, above), the IP as the `configuration_url` that turns the
+  device page into a link into the unit's own web interface. Three rows
+  in every entity list, every search result and every automation picker,
+  saying what the device page says.
+
+  Their registry entries are deleted on the first startup after
+  upgrading, so they do not linger as restored-and-unavailable entities
+  with a Delete button. The same cleanup removes `Wi-Fi status` and
+  `Internet connection` on a unit that reports itself as wired, and
+  leaves both alone - history included - on any unit that does not.
 
 ### Added
 
