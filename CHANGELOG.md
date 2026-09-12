@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Dutch calls a ventilated room a *ruimte* everywhere except one label,
+  which said *Kamersymbool* - one word out of step with the five around
+  it. Now `Ruimtesymbool`.
+- `API_KEY_STATE_EMPTY` is gone. Nothing read it: "empty" is just "not
+  valid" as far as any decision goes, and a constant nothing reads is a
+  constant that can drift from reality unnoticed. The three states the
+  endpoint answers with are named in a comment instead.
 - `manifest.json`'s `codeowners` is `@mmnlfrrr`, this fork's maintainer,
   rather than upstream's author. Home Assistant shows that name as the
   person responsible for the integration's code, and it decides who a
@@ -293,7 +300,26 @@ on an active API key.
 
 ### Fixed
 
-- **The VOC sensor now declares a device class**
+- **Boost no longer disappears on a decision tree that answers without
+  it.** Reading boost out of `/v2/decision` made it possible to lose every
+  room's boost at once, where losing it used to take its own endpoint
+  failing: a tree that answered but carried no boost - a firmware without
+  a `room` key, say - was taken at its word, and every boost fan went
+  unavailable on a device whose per-room endpoint answers perfectly well.
+  That case now falls back to it.
+
+  "No boost at all" rather than "not every room's": one room's malformed
+  block still costs that room its boost entity and nothing more, exactly
+  as the per-room endpoint did, and re-reading all seven because one is
+  odd would undo the point of the merged read.
+- **Renaming the integration no longer reloads it.** Home Assistant calls
+  an update listener on any change to a config entry, renaming included,
+  so a cosmetic rename tore the integration down and set it up again with
+  every entity going briefly unavailable. The listener now reloads only
+  when the poll interval actually changed - which was always its stated
+  purpose. The reconfigure and discovery-relocation flows reload
+  themselves, so they no longer get a second reload from here either.
+- The VOC sensor now declares a device class
   (`volatile_organic_compounds_parts`, Home Assistant's own class for a
   VOC *ratio* in ppm/ppb, as opposed to a density in µg/m³). It had none,
   which cost it its proper icon and - the visible part - the per-entity

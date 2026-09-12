@@ -11,7 +11,11 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import Healthbox3ApiClient, Healthbox3ConnectionError, Healthbox3Error
 from .card import async_register as async_register_card
 from .const import DOMAIN
-from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
+from .coordinator import (
+    Healthbox3ConfigEntry,
+    Healthbox3DataUpdateCoordinator,
+    scan_interval,
+)
 from .entity import unit_device_info
 from .icon_set import async_register as async_register_icon_set
 
@@ -84,15 +88,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: Healthbox3ConfigEntry) -
     # The poll interval is read once, when the coordinator is built, so a
     # change to it only takes effect on a reload - which this listener is
     # what triggers.
-    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def _async_reload_entry(
+async def _async_options_updated(
     hass: HomeAssistant, entry: Healthbox3ConfigEntry
 ) -> None:
-    """Reload the entry after its options change."""
+    """Reload the entry when the poll interval changes, and only then.
+
+    Home Assistant calls an update listener on *any* change to the entry,
+    not just its options - renaming it counts, and a rename used to tear
+    the integration down and set it up again, every entity going briefly
+    unavailable for a change that is purely cosmetic.
+
+    The reconfigure and discovery-relocation flows do their own reload
+    (`async_update_reload_and_abort`), so they no longer get a second one
+    from here either.
+
+    The comparison is against the interval the coordinator is actually
+    running on rather than a remembered copy: that is the applied value by
+    definition, so if the entry still asks for it, nothing about polling
+    has changed.
+    """
+    if entry.runtime_data.update_interval == scan_interval(entry):
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

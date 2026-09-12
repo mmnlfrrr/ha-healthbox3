@@ -211,7 +211,7 @@
         "name": "Wetgevingscode"
       },
       "room_symbol": {
-        "name": "Kamersymbool"
+        "name": "Ruimtesymbool"
       },
       "room_conductance": {
         "name": "Kanaalconductantie"

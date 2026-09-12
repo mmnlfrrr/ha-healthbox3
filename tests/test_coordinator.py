@@ -793,3 +793,59 @@ async def test_no_options_means_the_default_interval(hass, v2_data):
     """An entry from before the option existed keeps the interval it had."""
     entry = make_config_entry(hass, serial=v2_data.serial)
     assert scan_interval(entry) == DEFAULT_SCAN_INTERVAL
+
+
+async def test_a_tree_with_no_boost_at_all_falls_back_to_the_per_room_endpoint(
+    hass, v2_data, boost_status, device_decision
+):
+    """The merged read made it possible to lose every room's boost at once,
+    where losing it used to take its own endpoint failing.
+
+    A tree that answers but carries no boost is a response shaped in a way
+    this client does not recognise - a firmware without a `room` key, say.
+    Taking its word for it would leave every boost fan unavailable on a
+    device whose per-room endpoint answers perfectly well.
+    """
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    client = _client()
+    client.async_get_v2_data_current.return_value = v2_data
+    client.async_get_boost.return_value = boost_status
+    client.async_get_decision_tree.side_effect = None
+    client.async_get_decision_tree.return_value = api_mod.DecisionTree(
+        decision=device_decision, boost={}
+    )
+
+    coordinator = Healthbox3DataUpdateCoordinator(hass, entry, client, use_v2=True)
+    await coordinator.async_refresh()
+
+    assert len(coordinator.data.boost) == 7
+    assert client.async_get_boost.await_count == 7
+    # The rest of the tree is still used - only boost was missing from it.
+    assert coordinator.data.decision == device_decision
+
+
+async def test_one_rooms_missing_boost_does_not_trigger_the_fallback(
+    hass, v2_data, boost_status, device_decision
+):
+    """"No boost at all" rather than "not every room's": a single room's
+    block failing to parse costs that room its boost entity and nothing
+    more, which is exactly what the per-room endpoint did.
+
+    Re-reading all seven because one is missing would undo the whole point
+    of the merged read on any device with one odd room.
+    """
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    client = _client()
+    client.async_get_v2_data_current.return_value = v2_data
+    client.async_get_boost.return_value = boost_status
+    client.async_get_decision_tree.side_effect = None
+    client.async_get_decision_tree.return_value = api_mod.DecisionTree(
+        decision=device_decision,
+        boost={room.id: boost_status for room in v2_data.rooms if room.id != 3},
+    )
+
+    coordinator = Healthbox3DataUpdateCoordinator(hass, entry, client, use_v2=True)
+    await coordinator.async_refresh()
+
+    assert set(coordinator.data.boost) == {1, 2, 4, 5, 6, 7}
+    client.async_get_boost.assert_not_called()

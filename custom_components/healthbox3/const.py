@@ -206,8 +206,12 @@ CONDUCTANCE_UNIT = "m³/(h·√Pa)"
 # rather than inventing energy that may never have been used.
 ENERGY_MAX_GAP_SECONDS = 15 * 60
 
+# The states `/v2/api/api_key/status` is known to answer with are
+# "valid", "empty" and "validating". Only the two that this client
+# actually branches on are named here; "empty" is just "not valid" as far
+# as any decision goes, and a constant nothing reads is a constant that
+# can drift from reality unnoticed.
 API_KEY_STATE_VALID = "valid"
-API_KEY_STATE_EMPTY = "empty"
 
 # Third state of /v2/api/api_key/status, and the one that makes activation
 # asynchronous: POSTing a key does NOT decide anything by itself. The device

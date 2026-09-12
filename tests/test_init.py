@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import AsyncMock
 
 from homeassistant.config_entries import ConfigEntryState, SOURCE_REAUTH
+from homeassistant.const import CONF_SCAN_INTERVAL
 
 from custom_components.healthbox3 import api as api_mod
-from custom_components.healthbox3.const import DOMAIN
+from custom_components.healthbox3.const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 from .conftest import make_config_entry, setup_integration
 
@@ -133,3 +135,56 @@ async def test_unload_entry(hass, mock_api_client, v1_data, boost_status):
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_renaming_the_entry_does_not_reload_it(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """Home Assistant calls an update listener on any change to the entry,
+    renaming included.
+
+    That used to tear the integration down and set it up again - every
+    entity briefly unavailable - for a change that is purely cosmetic. It
+    is also what made a test in this suite fail in a way that took a while
+    to explain, which is how it was found.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+    coordinator = entry.runtime_data
+
+    hass.config_entries.async_update_entry(entry, title="Upstairs Healthbox")
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    # The same coordinator object: a reload would have built a new one.
+    assert entry.runtime_data is coordinator
+
+
+async def test_changing_the_poll_interval_does_reload_it(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The interval is read once, when the coordinator is built, so it only
+    takes effect on a reload - which is the listener's whole reason to
+    exist.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+    coordinator = entry.runtime_data
+    assert coordinator.update_interval == DEFAULT_SCAN_INTERVAL
+
+    hass.config_entries.async_update_entry(entry, options={CONF_SCAN_INTERVAL: 120})
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data is not coordinator
+    assert entry.runtime_data.update_interval == timedelta(seconds=120)

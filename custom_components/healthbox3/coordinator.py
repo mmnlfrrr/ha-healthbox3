@@ -271,12 +271,23 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         room. On a three-room unit that is six requests answered by one;
         on a seven-room unit, ten.
 
-        Without a key, and if that single read fails, boost still comes
-        from the per-room `/v1/api/boost/{id}` endpoint: it is the one
-        control that works without a key, and it should not disappear
-        because a v2 read that has nothing to do with it went wrong. That
-        fallback is the only path here that is sequential, and only ever
-        on the failure it exists for.
+        Boost falls back to the per-room `/v1/api/boost/{id}` endpoint in
+        three cases: no key, a failed read, and a read that answered
+        without any boost in it at all. It is the one control that works
+        without a key, and it should not disappear because a v2 read that
+        has nothing to do with it went wrong - or came back shaped in a
+        way this client does not recognise, which the merged read made a
+        way to lose every room's boost at once where losing it used to
+        take its own endpoint failing.
+
+        "Without any boost at all" rather than "without every room's":
+        a single room's block failing to parse costs that room its boost
+        entity and nothing more, which is exactly what the per-room
+        endpoint did. It is an empty result, on a device that does have
+        rooms, that says the response is not what we think it is.
+
+        The fallback is the only path here that is sequential, and only
+        ever on the failure it exists for.
 
         By this point `data/current` already succeeded, so the device is
         known reachable; a failure here means the entities built on what
@@ -288,8 +299,16 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             except Healthbox3Error as err:
                 _LOGGER.debug("Failed to fetch decision data: %s", err)
             else:
-                self._record_boost(healthbox, tree.boost)
-                return tree, tree.boost
+                if tree.boost:
+                    self._record_boost(healthbox, tree.boost)
+                    return tree, tree.boost
+                if healthbox.rooms:
+                    _LOGGER.debug(
+                        "The decision tree carried no boost status for any of "
+                        "%s rooms; falling back to the per-room endpoint",
+                        len(healthbox.rooms),
+                    )
+                return tree, await self._async_get_boost_data(healthbox)
 
         return None, await self._async_get_boost_data(healthbox)
 
