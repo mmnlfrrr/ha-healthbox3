@@ -168,16 +168,81 @@ def test_parse_decision_ignores_unread_keys(decision_raw):
     assert decision.silent.stop_time == "08:00:00"
 
 
-async def test_get_decision_parses_real_shape(decision_raw):
-    session = _FakeSession([_FakeResponse(200, json.dumps(decision_raw))])
+async def test_get_decision_tree_parses_a_real_response(v2_decision_raw):
+    """One read, four answers - checked against a real `/v2/decision`
+    capture rather than three hand-built slices of one.
+
+    This is what replaces `/v1/decision`, `/v2/decision/breeze`,
+    `/v2/decision/room` and one `/v1/api/boost/{id}` per room.
+    """
+    session = _FakeSession([_FakeResponse(200, json.dumps(v2_decision_raw))])
     client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
 
-    decision = await client.async_get_decision()
+    tree = await client.async_get_decision_tree()
 
-    assert decision.program_enabled is False
-    assert decision.global_minimum == 20.0
-    assert decision.global_ventilation_level == 45.0
-    assert decision.silent.enable is False
+    method, url, _ = session.calls[0]
+    assert (method, url.endswith("/v2/decision")) == ("GET", True)
+
+    assert tree.decision.program_enabled is False
+    assert tree.decision.global_minimum == 30.0
+    assert tree.decision.silent.reduction == 5.0
+
+    assert tree.breeze is not None
+    assert tree.breeze.average_temp == 30.0
+
+    # Only the kitchen has CO2 demand enabled on this unit.
+    assert tree.room_decisions[3].co2.enable is True
+    assert tree.room_decisions[3].co2.minimum == 800.0
+    assert tree.room_decisions[1].co2.enable is False
+
+    assert set(tree.boost) == {1, 2, 3}
+    assert tree.boost[1].enable is False
+    # The kitchen's own commissioned boost rate - the value that used to
+    # be clamped to the 200% Renson's app offers.
+    assert tree.boost[3].default_level == 270.0
+
+
+async def test_a_room_the_device_describes_badly_costs_only_that_room(
+    v2_decision_raw,
+):
+    """The four parts are parsed separately on purpose: a failure used to
+    cost one endpoint, and the merged read must not turn that into losing
+    everything.
+    """
+    v2_decision_raw["room"]["2"]["boost"] = "not a boost block"
+    session = _FakeSession([_FakeResponse(200, json.dumps(v2_decision_raw))])
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    tree = await client.async_get_decision_tree()
+
+    assert set(tree.boost) == {1, 3}
+    assert tree.decision.global_minimum == 30.0
+    assert tree.room_decisions[3].co2.enable is True
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("breeze", None),
+        ("breeze", "not a breeze block"),
+        ("room", None),
+    ],
+)
+async def test_a_missing_part_does_not_cost_the_decision_settings(
+    v2_decision_raw, key, value
+):
+    """Demand control, the silent schedule and the minimum ventilation
+    level all ride on this one response now. Losing Breeze - or every
+    room's block - must not take them with it.
+    """
+    v2_decision_raw[key] = value
+    session = _FakeSession([_FakeResponse(200, json.dumps(v2_decision_raw))])
+    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
+
+    tree = await client.async_get_decision_tree()
+
+    assert tree.decision.global_minimum == 30.0
+    assert tree.decision.silent.start_time == "22:00:00"
 
 
 @pytest.mark.parametrize("enable", [True, False])
@@ -270,15 +335,6 @@ def test_parse_breeze(breeze_raw):
     assert breeze.average_temp == 30.0
 
 
-async def test_get_breeze_parses_real_shape(breeze_raw):
-    session = _FakeSession([_FakeResponse(200, json.dumps(breeze_raw))])
-    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
-
-    breeze = await client.async_get_breeze()
-
-    assert breeze.average_temp == 30.0
-
-
 async def test_set_breeze_temp_sends_expected_payload():
     session = _FakeSession([_FakeResponse(200, "")])
     client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
@@ -301,16 +357,6 @@ def test_parse_room_decisions_reads_co2_static_only(room_decisions_raw):
     assert decisions[1].co2.enable is True
     assert decisions[1].co2.minimum == 650.0
     assert decisions[1].co2.maximum == 800.0
-    assert decisions[2].co2.enable is False
-
-
-async def test_get_room_decisions_parses_real_shape(room_decisions_raw):
-    session = _FakeSession([_FakeResponse(200, json.dumps(room_decisions_raw))])
-    client = api_mod.Healthbox3ApiClient("192.0.2.1", session)
-
-    decisions = await client.async_get_room_decisions()
-
-    assert decisions[1].co2.enable is True
     assert decisions[2].co2.enable is False
 
 

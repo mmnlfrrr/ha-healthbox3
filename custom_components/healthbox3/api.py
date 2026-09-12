@@ -24,6 +24,7 @@ from .const import (
     API_V2_API_KEY,
     API_V2_API_KEY_STATUS,
     API_V2_DATA_CURRENT,
+    API_V2_DECISION,
     API_V2_DECISION_BREEZE,
     API_V2_DECISION_ROOM,
     API_V2_PROFILE_NAME,
@@ -326,6 +327,71 @@ def _parse_room_decisions(raw: dict[str, Any]) -> dict[int, RoomDecision]:
             )
         )
     return result
+
+
+@dataclass
+class DecisionTree:
+    """Everything `GET /v2/decision` answers, in one response.
+
+    The device-wide settings are the same object `/v1/decision` returns,
+    `breeze` and `room` are what `/v2/decision/breeze` and
+    `/v2/decision/room` return when asked for on their own, and each
+    room's block carries the same boost object as `/v1/api/boost/{id}`.
+    One read where there used to be three endpoints plus one request per
+    room - see const.py's API_V2_DECISION.
+
+    Only `decision` is required. The rest degrade to None/{} rather than
+    failing the read: they are separate features, and losing Breeze (or
+    one room's boost) to a firmware that shapes its block differently
+    should not also cost demand control, the silent schedule and the
+    minimum ventilation level, which all ride on the same response.
+    """
+
+    decision: DeviceDecision
+    breeze: BreezeSettings | None = None
+    room_decisions: dict[int, RoomDecision] = field(default_factory=dict)
+    boost: dict[int, BoostStatus] = field(default_factory=dict)
+
+
+def _parse_decision_tree(raw: dict[str, Any]) -> DecisionTree:
+    """Parse one `/v2/decision` response into its four parts.
+
+    Each optional part is parsed defensively and on its own, so that the
+    single read degrades the way the four separate ones did: a failure
+    used to cost that endpoint only.
+    """
+    rooms = raw.get("room")
+    if not isinstance(rooms, dict):
+        rooms = {}
+
+    boost: dict[int, BoostStatus] = {}
+    for room_id, room in rooms.items():
+        try:
+            boost[int(room_id)] = _parse_boost(room["boost"])
+        except (KeyError, TypeError, ValueError):
+            # Per room, as the per-room endpoint was: one room's boost
+            # entity goes unavailable, the others do not follow it.
+            _LOGGER.debug("Ignoring unparseable boost block for room %r", room_id)
+
+    try:
+        room_decisions = _parse_room_decisions(rooms)
+    except (KeyError, TypeError, ValueError):
+        _LOGGER.debug("Ignoring unparseable room decision data")
+        room_decisions = {}
+
+    breeze_raw = raw.get("breeze")
+    try:
+        breeze = _parse_breeze(breeze_raw) if isinstance(breeze_raw, dict) else None
+    except (KeyError, TypeError):
+        _LOGGER.debug("Ignoring unparseable breeze data")
+        breeze = None
+
+    return DecisionTree(
+        decision=_parse_decision(raw),
+        breeze=breeze,
+        room_decisions=room_decisions,
+        boost=boost,
+    )
 
 
 # Maps a 5-digit error code's first 3 digits to a short category name.
@@ -1132,11 +1198,17 @@ class Healthbox3ApiClient:
                 "Unexpected discovery response shape"
             ) from err
 
-    async def async_get_decision(self) -> DeviceDecision:
-        """Fetch and parse `/v1/decision`. Requires an active API key."""
-        raw = await self._request("GET", API_V1_DECISION)
+    async def async_get_decision_tree(self) -> DecisionTree:
+        """Fetch and parse `/v2/decision`. Requires an active API key.
+
+        One read for the device-wide decision settings, Breeze, every
+        room's CO2 demand and every room's boost status - see
+        DecisionTree and const.py's API_V2_DECISION for why they come
+        together rather than from four places.
+        """
+        raw = await self._request("GET", API_V2_DECISION)
         try:
-            return _parse_decision(raw)
+            return _parse_decision_tree(raw)
         except (KeyError, TypeError) as err:
             raise Healthbox3InvalidResponseError(
                 "Unexpected decision response shape"
@@ -1159,31 +1231,11 @@ class Healthbox3ApiClient:
         """Set the device-wide minimum ventilation level. Requires an active API key."""
         await self._request("PUT", API_V1_DECISION, json={"minimum": value})
 
-    async def async_get_breeze(self) -> BreezeSettings:
-        """Fetch and parse `/v2/decision/breeze`. Requires an active API key."""
-        raw = await self._request("GET", API_V2_DECISION_BREEZE)
-        try:
-            return _parse_breeze(raw)
-        except (KeyError, TypeError) as err:
-            raise Healthbox3InvalidResponseError(
-                "Unexpected breeze response shape"
-            ) from err
-
     async def async_set_breeze_temp(self, value: float) -> None:
         """Set Breeze's trigger average outdoor temperature. Requires an active API key."""
         await self._request(
             "PUT", API_V2_DECISION_BREEZE, json={"average_temp": value}
         )
-
-    async def async_get_room_decisions(self) -> dict[int, RoomDecision]:
-        """Fetch and parse `/v2/decision/room`. Requires an active API key."""
-        raw = await self._request("GET", API_V2_DECISION_ROOM)
-        try:
-            return _parse_room_decisions(raw)
-        except (KeyError, TypeError) as err:
-            raise Healthbox3InvalidResponseError(
-                "Unexpected room decision response shape"
-            ) from err
 
     async def async_set_room_co2_threshold(
         self, room_id: int, *, minimum: float, maximum: float

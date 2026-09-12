@@ -9,13 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A poll is five requests now, whatever the room count.** It was seven
+  plus one per room - fourteen on a seven-room installation - because
+  boost was read one room at a time, and the decision settings, Breeze
+  and per-room CO2 demand each had their own endpoint.
+
+  All four are slices of `/v2/decision`, which answers with the lot in a
+  single response: the same device-wide block `/v1/decision` returns, the
+  same objects `/v2/decision/breeze` and `/v2/decision/room` return, and
+  each room's `boost` exactly as `/v1/api/boost/{id}` gives it. Confirmed
+  against a real capture, which is now a fixture.
+
+  The four parts are still parsed separately, so the merged read degrades
+  the way the four separate ones did: one room's malformed boost block
+  costs that room's boost entity, a missing `breeze` costs Breeze, and
+  neither takes demand control, the silent schedule or the minimum
+  ventilation level down with it. Without an API key - and if that single
+  read fails - boost still comes from the per-room endpoint, which is the
+  one control confirmed to work without a key.
+
+  The sub-resources are still used for writes, which are per-setting.
 - **A poll no longer walks its endpoints one at a time.** `data/current`
   still goes first alone - it decides whether this is a v1 or a v2 poll and
-  which rooms exist - but the eight reads behind it now go out together,
-  with the client capping how many are actually in flight so a seven-room
-  installation does not land fourteen requests on a small embedded unit at
-  once. Sequentially, at up to the 10s per-request timeout, a slow poll
-  could outlast the interval that scheduled it.
+  which rooms exist - but the reads behind it now go out together, with the
+  client capping how many are actually in flight rather than landing the
+  lot on a small embedded unit at once. Sequentially, at up to the 10s
+  per-request timeout, a slow poll could outlast the interval that
+  scheduled it. (This is what first cut the poll's wall time; the entry
+  above later cut the number of requests itself.)
 
   `/renson_core/v2/global` is also re-read every tenth minute rather than
   every poll: firmware version, MAC and IP change on a firmware update or a

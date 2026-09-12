@@ -66,6 +66,24 @@ API_V1_DECISION = "/v1/decision"
 GLOBAL_MINIMUM_VENTILATION_MIN = 10.0
 GLOBAL_MINIMUM_VENTILATION_MAX = 30.0
 
+# The whole decision tree in one response, confirmed on real hardware
+# (firmware 2.6.9): `program`, `minimum`, `global_ventilation_level` and
+# `silent` exactly as `/v1/decision` gives them, plus `breeze` and `room`,
+# which are what `/v2/decision/breeze` and `/v2/decision/room` return when
+# asked for on their own - those two are literally sub-resources of this
+# one. Each room's block also carries the same `boost` object as
+# `/v1/api/boost/{id}`.
+#
+# So one read answers what used to take three endpoints plus one request
+# per room: 6 requests on a three-room unit, 10 on a seven-room one. The
+# sub-resources are still used for *writes*, which are per-setting.
+#
+# Same undocumented/reverse-engineered status as API_V1_DECISION above,
+# and read-gated the same way: the one capture proving this response's
+# shape came from a device with an active API key, so it says nothing
+# about whether the endpoint answers without one.
+API_V2_DECISION = "/v2/decision"
+
 # Same undocumented/reverse-engineered status as API_V1_DECISION above.
 API_V2_DECISION_BREEZE = "/v2/decision/breeze"
 

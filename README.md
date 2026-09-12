@@ -502,11 +502,19 @@ minutes. The entry reloads itself when you change it.
 
 Pick a shorter one knowingly: a poll is not one request. `data/current`
 goes first, since it's the call that decides whether this is a v1 or a v2
-poll and which rooms exist; then every other endpoint goes out together -
-boost (one request *per room*), decision, Breeze, per-room decisions,
-device errors, fan/duct telemetry and Wi-Fi status. On a seven-room
-installation that's fourteen requests per poll, against a small embedded
-unit. They're issued concurrently but capped, so they overlap without
+poll and which rooms exist; then the rest go out together - the decision
+tree, device errors, fan/duct telemetry and Wi-Fi status. **Five requests
+per poll**, whatever the room count, against a small embedded unit.
+
+It used to be seven plus one per room - fourteen on a seven-room
+installation - because boost was read one room at a time and the decision
+settings, Breeze and per-room demand each had their own endpoint. All four
+of those are slices of `/v2/decision`, which answers with the lot in one
+response, so that is what gets read. Without an API key, boost still comes
+from the per-room endpoint, which is the one thing confirmed to work
+without one.
+
+The five are issued concurrently but capped, so they overlap without
 arriving all at once, and `/renson_core/v2/global` (firmware version, MAC,
 IP - things that don't change between two polls) is only re-read every
 tenth minute rather than every cycle.

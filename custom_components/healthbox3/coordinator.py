@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .api import (
     BoostStatus,
     BreezeSettings,
+    DecisionTree,
     DeviceDecision,
     DeviceError,
     DeviceTelemetry,
@@ -239,68 +240,58 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         healthbox = await self._async_get_healthbox_data()
 
         async with asyncio.TaskGroup() as group:
-            boost = group.create_task(self._async_get_boost_data(healthbox))
-            decision = group.create_task(self._async_get_decision_data())
-            breeze = group.create_task(self._async_get_breeze_data())
-            room_decisions = group.create_task(self._async_get_room_decisions_data())
+            decision = group.create_task(self._async_get_decision_and_boost(healthbox))
             global_info = group.create_task(self._async_get_global_data())
             errors = group.create_task(self._async_get_errors_data())
             device = group.create_task(self._async_get_device_data())
             wifi = group.create_task(self._async_get_wifi_data())
 
+        tree, boost = decision.result()
         self._async_reconcile_error_issues(errors.result())
         return Healthbox3Data(
             healthbox=healthbox,
-            boost=boost.result(),
-            decision=decision.result(),
-            breeze=breeze.result(),
-            room_decisions=room_decisions.result(),
+            boost=boost,
+            decision=tree.decision if tree is not None else None,
+            breeze=tree.breeze if tree is not None else None,
+            room_decisions=tree.room_decisions if tree is not None else {},
             global_info=global_info.result(),
             errors=errors.result(),
             device=device.result(),
             wifi=wifi.result(),
         )
 
-    async def _async_get_decision_data(self) -> DeviceDecision | None:
-        """Fetch `/v1/decision`, tolerating failure the same way boost does.
+    async def _async_get_decision_and_boost(
+        self, healthbox: HealthboxData
+    ) -> tuple[DecisionTree | None, dict[int, BoostStatus]]:
+        """Fetch the decision tree and every room's boost status.
+
+        With an API key this is a single `/v2/decision` read, which
+        carries both - where it used to take `/v1/decision`,
+        `/v2/decision/breeze`, `/v2/decision/room` and one request per
+        room. On a three-room unit that is six requests answered by one;
+        on a seven-room unit, ten.
+
+        Without a key, and if that single read fails, boost still comes
+        from the per-room `/v1/api/boost/{id}` endpoint: it is the one
+        control that works without a key, and it should not disappear
+        because a v2 read that has nothing to do with it went wrong. That
+        fallback is the only path here that is sequential, and only ever
+        on the failure it exists for.
 
         By this point `data/current` already succeeded, so the device is
-        known reachable; a failure here just means the entities built on
-        it go unavailable, not a full update failure. Also never attempted
-        without an active API key - see const.py's API_V1_DECISION comment
-        on why that's a deliberately conservative, not yet proven,
-        assumption.
+        known reachable; a failure here means the entities built on what
+        is missing go unavailable, not that the whole update fails.
         """
-        if not self.use_v2:
-            return None
-        try:
-            return await self.client.async_get_decision()
-        except Healthbox3Error as err:
-            _LOGGER.debug("Failed to fetch decision data: %s", err)
-            return None
+        if self.use_v2:
+            try:
+                tree = await self.client.async_get_decision_tree()
+            except Healthbox3Error as err:
+                _LOGGER.debug("Failed to fetch decision data: %s", err)
+            else:
+                self._record_boost(healthbox, tree.boost)
+                return tree, tree.boost
 
-    async def _async_get_breeze_data(self) -> BreezeSettings | None:
-        """Fetch `/v2/decision/breeze` - same gating/tolerance as decision."""
-        if not self.use_v2:
-            return None
-        try:
-            return await self.client.async_get_breeze()
-        except Healthbox3Error as err:
-            _LOGGER.debug("Failed to fetch breeze data: %s", err)
-            return None
-
-    async def _async_get_room_decisions_data(self) -> dict[int, RoomDecision]:
-        """Fetch `/v2/decision/room` - same gating/tolerance as decision and
-        breeze, but returns `{}` (not `None`) on failure/v1-only, since
-        callers key into it per room id the same way boost does.
-        """
-        if not self.use_v2:
-            return {}
-        try:
-            return await self.client.async_get_room_decisions()
-        except Healthbox3Error as err:
-            _LOGGER.debug("Failed to fetch room decision data: %s", err)
-            return {}
+        return None, await self._async_get_boost_data(healthbox)
 
     async def _async_get_global_data(self) -> GlobalInfo | None:
         """Fetch `/renson_core/v2/global` - same gating/tolerance as
@@ -547,15 +538,49 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         self.use_v2 = False
         self.config_entry.async_start_reauth(self.hass)
 
+    def _record_boost(
+        self, healthbox: HealthboxData, boost: dict[int, BoostStatus]
+    ) -> None:
+        """Note each room's boost ceiling, and seed its staged level once.
+
+        Called from both boost paths - the single `/v2/decision` read and
+        the per-room fallback - since what it records describes the rooms,
+        not where their status was read from. Rooms the device no longer
+        reports are skipped rather than remembered.
+        """
+        live = {room.id for room in healthbox.rooms}
+        for room_id, status in boost.items():
+            if room_id not in live:
+                continue
+            # The room's ceiling is refreshed every poll, unlike the staged
+            # level below: it describes the device's own configuration, so
+            # a room reconfigured at the unit must not keep answering to
+            # the range it had when Home Assistant first saw it.
+            self.boost_level_max[room_id] = _level_ceiling(status.default_level)
+            if room_id not in self.boost_params:
+                # Seed once from the room's own device-reported defaults;
+                # never overwritten afterwards so a user's own choice (or a
+                # restored one) sticks across refreshes.
+                self.boost_params[room_id] = BoostParams(
+                    level=_clamp_level(
+                        status.default_level, self.boost_level_max[room_id]
+                    ),
+                    timeout=_clamp_timeout(status.default_timeout),
+                )
+
     async def _async_get_boost_data(
         self, healthbox: HealthboxData
     ) -> dict[int, BoostStatus]:
-        """Fetch boost status for every room.
+        """Fetch boost status one room at a time, from `/v1/api/boost/{id}`.
 
-        By this point `data/current` already succeeded, so the device is
-        known reachable; a failure fetching one room's boost status is
-        treated as that room's boost entity going unavailable, not as a
-        full update failure.
+        The fallback path - see `_async_get_decision_and_boost`, which
+        gets the same data in a single request whenever the key allows
+        it. Kept because this endpoint is the only one that answers
+        without a key.
+
+        A failure fetching one room's boost status is treated as that
+        room's boost entity going unavailable, not as a full update
+        failure.
         """
         results = await asyncio.gather(
             *(self.client.async_get_boost(room.id) for room in healthbox.rooms),
@@ -571,19 +596,5 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
             if isinstance(result, BaseException):
                 raise result
             boost[room.id] = result
-            # The room's ceiling is refreshed every poll, unlike the staged
-            # level below: it describes the device's own configuration, so
-            # a room reconfigured at the unit must not keep answering to
-            # the range it had when Home Assistant first saw it.
-            self.boost_level_max[room.id] = _level_ceiling(result.default_level)
-            if room.id not in self.boost_params:
-                # Seed once from the room's own device-reported defaults;
-                # never overwritten afterwards so a user's own choice (or a
-                # restored one) sticks across refreshes.
-                self.boost_params[room.id] = BoostParams(
-                    level=_clamp_level(
-                        result.default_level, self.boost_level_max[room.id]
-                    ),
-                    timeout=_clamp_timeout(result.default_timeout),
-                )
+        self._record_boost(healthbox, boost)
         return boost

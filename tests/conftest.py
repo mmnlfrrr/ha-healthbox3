@@ -156,6 +156,19 @@ def room_decisions(room_decisions_raw) -> dict[int, api_mod.RoomDecision]:
 
 
 @pytest.fixture
+def v2_decision_raw() -> dict:
+    """Raw JSON from a real device's /v2/decision, commissioning answers
+    redacted (they describe the dwelling, not the device).
+
+    The whole decision tree in one response - profiles, per-room boost and
+    demand, Breeze, Silent, Program, fire protection. The three hand-built
+    fixtures it joins (v1-decision, v2-decision-breeze, v2-decision-room)
+    are each one slice of this, from back when each was read separately.
+    """
+    return _load_fixture("v2-decision.json")
+
+
+@pytest.fixture
 def renson_core_global_raw() -> dict:
     """Raw JSON from a real device's /renson_core/v2/global, identifying
     fields redacted.
@@ -219,24 +232,32 @@ def mock_api_client():
     async_get_api_key_status) become AsyncMocks instead of plain MagicMocks
     that return a non-awaitable value.
 
-    async_get_room_decisions defaults to an empty dict rather than being
-    left unconfigured: an autospec'd AsyncMock's unconfigured return value
-    is itself an AsyncMock, not a real dict (a genuine unittest.mock
-    quirk - the returned mock's `.get()` returns an unawaited coroutine,
-    not None), and number.py's setup loop calls `.get()` on it directly,
-    unlike decision/breeze which only check `is not None` - so every v2
-    test that doesn't care about CO2 thresholds would otherwise crash the
-    whole number platform's async_setup_entry. Same fix pattern as the
-    autouse broadcast-discovery fixtures above: default new async calls to
-    a safe value so pre-existing tests are unaffected.
+    async_get_decision_tree defaults to failing rather than being left
+    unconfigured: an autospec'd AsyncMock's unconfigured return value is
+    itself an AsyncMock, not a real DecisionTree (a genuine unittest.mock
+    quirk), which the coordinator would store as real decision data -
+    every entity built on it then reads attributes off a mock and reports
+    one as its state, and number.py's setup loop calls `.get()` on what it
+    thinks is a dict of room decisions and gets an unawaited coroutine
+    back.
+
+    Failing rather than answering None because the client either returns a
+    tree or raises - there is no third answer - and a failed read is what
+    a test saying nothing about the tree is really describing. Same fix
+    pattern as the autouse broadcast-discovery fixtures above: default new
+    async calls to a safe value so pre-existing tests are unaffected.
     """
     with patch(
         "custom_components.healthbox3.Healthbox3ApiClient",
         autospec=True,
     ) as mock_cls:
         client = mock_cls.return_value
-        client.async_get_room_decisions = AsyncMock(return_value={})
-        # Same autospec quirk as async_get_room_decisions above: left
+        client.async_get_decision_tree = AsyncMock(
+            side_effect=api_mod.Healthbox3ConnectionError(
+                "no decision tree configured in this test"
+            )
+        )
+        # Same autospec quirk as async_get_decision_tree above: left
         # unconfigured these return an AsyncMock, not None, which the
         # coordinator would happily store as real telemetry - every
         # /v1/device-backed entity would then read attributes off a mock
@@ -329,14 +350,47 @@ async def setup_integration(
         )
     if boost_status is not None:
         mock_api_client.async_get_boost = AsyncMock(return_value=boost_status)
-    if decision is not None:
-        mock_api_client.async_get_decision = AsyncMock(return_value=decision)
-    if breeze is not None:
-        mock_api_client.async_get_breeze = AsyncMock(return_value=breeze)
-    if room_decisions is not None:
-        mock_api_client.async_get_room_decisions = AsyncMock(
-            return_value=room_decisions
+
+    # With a key the coordinator makes one `/v2/decision` read carrying the
+    # decision settings, Breeze, room demand *and* every room's boost. The
+    # arguments above still describe those four separately, so they are
+    # assembled into that single response here rather than at every call
+    # site.
+    #
+    # Boost is read back through `async_get_boost` rather than from
+    # `boost_status` directly, so a test giving a per-room side_effect gets
+    # the same per-room answers whichever path the coordinator takes.
+    #
+    # A test that describes no decision gets a read that fails, not one
+    # that answers None - the client either returns a tree or raises, and
+    # "the tree could not be read" is the real situation those tests are
+    # in. The coordinator then falls back to the per-room boost endpoint,
+    # which is what every test written before this read existed expects.
+    # The device answers the whole tree at once - there is no response
+    # carrying Breeze or room demand but no decision block - so a test
+    # asking for one without the other gets the fixture's decision, rather
+    # than a shape the device cannot produce.
+    effective_decision = decision
+    if effective_decision is None and (breeze is not None or room_decisions is not None):
+        effective_decision = api_mod._parse_decision(_load_fixture("v1-decision.json"))
+
+    async def _decision_tree() -> api_mod.DecisionTree:
+        if effective_decision is None:
+            raise api_mod.Healthbox3ConnectionError("no decision data in this test")
+        boost: dict[int, api_mod.BoostStatus] = {}
+        for room in healthbox_data.rooms if healthbox_data is not None else []:
+            try:
+                boost[room.id] = await mock_api_client.async_get_boost(room.id)
+            except api_mod.Healthbox3Error:
+                pass
+        return api_mod.DecisionTree(
+            decision=effective_decision,
+            breeze=breeze,
+            room_decisions=room_decisions or {},
+            boost=boost,
         )
+
+    mock_api_client.async_get_decision_tree = AsyncMock(side_effect=_decision_tree)
     if firmware_version is not None:
         mock_api_client.async_get_global = AsyncMock(
             return_value=api_mod.GlobalInfo(
