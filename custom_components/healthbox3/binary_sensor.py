@@ -27,6 +27,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import INTERFACE_TYPE_WIFI
 from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
 from .entity import Healthbox3Entity
 
@@ -125,6 +126,16 @@ class Healthbox3InternetBinarySensor(Healthbox3Entity, BinarySensorEntity):
     it's the precondition for the device validating its API key - so when
     the advanced-access sensor above goes off, this is the first place to
     look.
+
+    Only ever reported on a unit attached over Wi-Fi. The figure comes
+    from `/renson_core/v1/wifi/client/status`, which describes the Wi-Fi
+    *client* - so on a unit wired over Ethernet it answers "no connection"
+    about a radio that is simply switched off, saying nothing whatsoever
+    about the cable. Shown as-is, that read as a fault on a device that is
+    not only fine but demonstrably online, since a validated API key
+    requires exactly the internet access it was denying. Unavailable is
+    the honest answer: the device offers no way to know. `Connection type`
+    sits beside it and says ETHERNET, which is the explanation.
     """
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
@@ -141,9 +152,16 @@ class Healthbox3InternetBinarySensor(Healthbox3Entity, BinarySensorEntity):
     @property
     @override
     def available(self) -> bool:
-        """Return whether the device's Wi-Fi status is known."""
+        """Return whether this unit is on Wi-Fi and reported its state."""
+        info = self.coordinator.data.global_info
         wifi = self.coordinator.data.wifi
-        return super().available and wifi is not None and wifi.internet_connection is not None
+        return (
+            super().available
+            and info is not None
+            and (info.interface_type or "").upper() == INTERFACE_TYPE_WIFI
+            and wifi is not None
+            and wifi.internet_connection is not None
+        )
 
     @property
     @override

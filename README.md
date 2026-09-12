@@ -251,7 +251,7 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `Wi-Fi status` | The device's Wi-Fi client status, with SSID as an attribute - diagnostic entity, requires an active API key |
 | `binary_sensor` | `Problem` | On while the device reports any error - the boolean companion to `Device errors`, requires an active API key |
 | `binary_sensor` | `Advanced API access` | Whether privileged (v2) access is currently working - diagnostic entity, always created |
-| `binary_sensor` | `Internet connection` | Whether the device reports internet access - diagnostic entity, requires an active API key |
+| `binary_sensor` | `Internet connection` | Whether the device reports internet access. Only on a unit attached over Wi-Fi: the figure comes from the Wi-Fi client's own status, which says nothing about an Ethernet cable, so a wired unit reports unavailable rather than "disconnected" - diagnostic entity, requires an active API key |
 | `select` | `<room> Profile` | eco/health/intense - only created with an active API key |
 | `fan` | `<room> Boost` | Boost for that room - see "Boost control" below |
 | `fan` | `Boost all` | Boost for every room at once, at one shared level/duration - on only when every room currently reports boost enabled |

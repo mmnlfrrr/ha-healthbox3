@@ -17,6 +17,7 @@ import logging
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.const import STATE_ON, STATE_UNAVAILABLE
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from custom_components.healthbox3 import api as api_mod
@@ -464,9 +465,15 @@ async def test_problem_binary_sensor_follows_the_error_list(
     assert _state(hass, "binary_sensor", v2_data.serial, "device_problem").state == "off"
 
 
-async def test_internet_binary_sensor_reports_device_connectivity(
+async def test_internet_is_not_reported_when_the_interface_is_unknown(
     hass, mock_api_client, v2_data, boost_status, wifi_status
 ):
+    """Without `/renson_core/v2/global` there is no way to tell whether the
+    Wi-Fi endpoint describes how this unit is attached or an idle radio.
+
+    Reporting its answer anyway is what produced a "Disconnected" reading
+    on a wired unit, so not knowing has to read as not knowing.
+    """
     await setup_integration(
         hass,
         mock_api_client,
@@ -477,7 +484,7 @@ async def test_internet_binary_sensor_reports_device_connectivity(
     )
 
     state = _state(hass, "binary_sensor", v2_data.serial, "internet_connection")
-    assert state.state == "on"
+    assert state.state == STATE_UNAVAILABLE
 
 
 async def test_advanced_api_binary_sensor_exists_without_a_key(
@@ -868,3 +875,69 @@ async def test_a_rooms_entity_ids_carry_the_prefix(
 
     assert hass.states.get("sensor.healthbox_toilet_temperature") is not None
     assert hass.states.get("sensor.toilet_temperature") is None
+
+
+async def test_internet_is_not_reported_on_a_wired_unit(
+    hass, mock_api_client, v2_data, boost_status, firmware_version
+):
+    """`/renson_core/v1/wifi/client/status` describes the Wi-Fi *client*.
+
+    On a unit wired over Ethernet it answers "no connection" about a radio
+    that is simply switched off - which was shown as "Disconnected", a
+    fault-looking reading on a device that is not only fine but
+    demonstrably online: a validated API key requires exactly the internet
+    access it was denying.
+    """
+    mock_api_client.async_get_global = AsyncMock(
+        return_value=api_mod.GlobalInfo(
+            firmware_version=firmware_version, interface_type="ETHERNET"
+        )
+    )
+    mock_api_client.async_get_wifi_status = AsyncMock(
+        return_value=api_mod.WifiStatus(
+            status="disabled", ssid=None, internet_connection=False
+        )
+    )
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    state = _state(hass, "binary_sensor", v2_data.serial, "internet_connection")
+    assert state is not None, "the entity still exists"
+    assert state.state == STATE_UNAVAILABLE
+
+    # The sensor that does answer for a wired unit still says so.
+    connection = _state(hass, "sensor", v2_data.serial, "connection_type")
+    assert connection.state == "ETHERNET"
+
+
+async def test_internet_is_reported_on_a_wifi_unit(
+    hass, mock_api_client, v2_data, boost_status, firmware_version
+):
+    """The reading is meaningful exactly when the radio is what attaches
+    this unit to the network.
+    """
+    mock_api_client.async_get_global = AsyncMock(
+        return_value=api_mod.GlobalInfo(
+            firmware_version=firmware_version, interface_type="WIFI"
+        )
+    )
+    mock_api_client.async_get_wifi_status = AsyncMock(
+        return_value=api_mod.WifiStatus(
+            status="connected", ssid="MyNetwork", internet_connection=True
+        )
+    )
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    state = _state(hass, "binary_sensor", v2_data.serial, "internet_connection")
+    assert state.state == STATE_ON

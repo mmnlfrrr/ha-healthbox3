@@ -170,6 +170,12 @@ API_V1_DEVICE = "/v1/device"
 # Confirmed shape from docs/fixtures/wifi-client-status.json.
 API_RENSON_CORE_V1_WIFI_STATUS = "/renson_core/v1/wifi/client/status"
 
+# What `/renson_core/v2/global` calls a Wi-Fi attachment in its `IFTYPE`
+# field; the other value seen on real hardware is "ETHERNET". It is the
+# only way to tell whether the Wi-Fi endpoint above is describing how this
+# unit is actually attached to the network, or an idle radio.
+INTERFACE_TYPE_WIFI = "WIFI"
+
 # /v1/device keys its per-valve conductance and pressure blocks by the
 # collector PORT number, not by room id - this room parameter is the join
 # key between the two endpoints. Reported as a string on the wire (e.g.

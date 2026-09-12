@@ -314,6 +314,18 @@ on an active API key.
 
 ### Fixed
 
+- **`Internet connection` no longer reads "disconnected" on a unit wired
+  over Ethernet.** The figure comes from
+  `/renson_core/v1/wifi/client/status`, which describes the Wi-Fi
+  *client* - so on a wired unit it answered "no connection" about a radio
+  that is simply switched off, saying nothing whatsoever about the cable.
+
+  Shown as-is that read as a fault on a device that is not only fine but
+  demonstrably online: a validated API key requires exactly the internet
+  access it was denying. The sensor is now reported only on a unit
+  actually attached over Wi-Fi, and unavailable otherwise - the device
+  offers no way to know. `Connection type` sits beside it and says
+  ETHERNET, which is the explanation.
 - **Boost no longer disappears on a decision tree that answers without
   it.** Reading boost out of `/v2/decision` made it possible to lose every
   room's boost at once, where losing it used to take its own endpoint
