@@ -519,6 +519,24 @@ arriving all at once, and `/renson_core/v2/global` (firmware version, MAC,
 IP - things that don't change between two polls) is only re-read every
 tenth minute rather than every cycle.
 
+### Units
+
+Renson's own app has a Units screen - m³/h, cfm or l/s for airflow; Pa,
+psi or inches of water column for pressure; °C or °F. Home Assistant does
+the same thing itself, so this integration does not add a screen for it:
+
+- **All at once**, from your own profile or the system settings
+  (**Settings** → **System** → **General**), which set the unit system
+  everything follows.
+- **One reading at a time**: open the entity, press the gear, and pick
+  from **Unit of measurement**. Airflow offers m³/h, ft³/min and l/s (plus
+  eight more); pressure offers Pa, psi and inH₂O - Renson's own three -
+  plus hPa, bar, mmHg and others; temperature offers °C and °F.
+
+The conversion is Home Assistant's, applied to the reading as it is
+displayed and recorded. The device is always read in its own units, so
+nothing is written back to it and switching back and forth costs nothing.
+
 ## Known limitations
 
 - **Automatic network discovery is unreliable on some networks.** Setup

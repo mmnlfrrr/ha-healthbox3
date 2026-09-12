@@ -5,6 +5,11 @@ from __future__ import annotations
 import copy
 
 import pytest
+from homeassistant.const import (
+    UnitOfPressure,
+    UnitOfTemperature,
+    UnitOfVolumeFlowRate,
+)
 
 from .conftest import setup_integration
 
@@ -624,3 +629,45 @@ async def test_silent_switch_unavailable_when_decision_fetch_failed(
     await hass.async_block_till_done()
 
     assert hass.states.get(f"switch.{_PREFIX}_silent").state == "unavailable"
+
+
+async def test_every_physical_reading_can_be_shown_in_another_unit(
+    hass, mock_api_client, v2_data, boost_status, device_telemetry, device_decision
+):
+    """Renson's own app has a Units screen - m³/h / cfm / l/s, Pa / psi /
+    inches of water column, °C / °F. Home Assistant does the same thing
+    natively, per entity, but only for a sensor that declares a device
+    class it can convert: without one the unit is a bare label and the
+    picker does not appear.
+
+    So rather than building a units screen, this checks the three
+    categories are actually declared - which is what makes that picker
+    show up. A sensor shipped with a convertible unit but no device class
+    would look perfectly fine and silently lack the feature.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        device=device_telemetry,
+        decision=device_decision,
+    )
+
+    convertible = {
+        UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
+        UnitOfPressure.PA,
+        UnitOfTemperature.CELSIUS,
+    }
+    seen: set[str] = set()
+    for state in hass.states.async_all("sensor"):
+        unit = state.attributes.get("unit_of_measurement")
+        if unit not in convertible:
+            continue
+        seen.add(unit)
+        assert state.attributes.get("device_class") is not None, state.entity_id
+
+    # All three of the categories Renson's own screen offers are present,
+    # so this cannot quietly pass by finding nothing to check.
+    assert seen == convertible

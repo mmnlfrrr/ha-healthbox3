@@ -287,6 +287,12 @@ on an active API key.
 
 ### Fixed
 
+- **The VOC sensor now declares a device class**
+  (`volatile_organic_compounds_parts`, Home Assistant's own class for a
+  VOC *ratio* in ppm/ppb, as opposed to a density in µg/m³). It had none,
+  which cost it its proper icon and - the visible part - the per-entity
+  **Unit of measurement** picker every other physical reading here has.
+  Its unit, its state and its history are unchanged.
 - **A room whose boost level exceeds what Renson's app offers is no longer
   clamped to it.** The boost scale was fixed at 10-200%, described as "the
   range offered by Renson's own app" - but the device does not stop there.

@@ -95,13 +95,21 @@ ROOM_SENSOR_META: dict[str, RoomSensorMeta] = {
     SENSOR_TYPE_VOC: RoomSensorMeta(
         translation_key="room_voc",
         parameter_keys=("concentration", "voc_calc_embedded"),
-        device_class=None,
+        # Home Assistant's own class for a VOC *ratio* (ppm/ppb), as
+        # opposed to VOLATILE_ORGANIC_COMPOUNDS, which is a density in
+        # µg/m3. This reading is a ratio, and declaring it gets the
+        # reading its proper icon and the same per-entity unit picker
+        # every other physical reading here has.
+        device_class=SensorDeviceClass.VOLATILE_ORGANIC_COMPOUNDS_PARTS,
         native_unit_of_measurement=UnitOfRatio.PARTS_PER_MILLION,
         suggested_display_precision=0,
     ),
     SENSOR_TYPE_AQI: RoomSensorMeta(
         translation_key="room_aqi",
         parameter_keys=("index",),
+        # An index on Renson's own 0-100+ scale, with no unit and no
+        # physical quantity behind it - there is no device class for that,
+        # and inventing one would only mis-describe it.
         device_class=None,
         native_unit_of_measurement=None,
         suggested_display_precision=1,
