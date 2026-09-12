@@ -4,6 +4,19 @@ from datetime import timedelta
 
 DOMAIN = "healthbox3"
 
+# What the unit's device is called, and the prefix every room device
+# carries. Not the device's own `description`, which reads "Healthbox 3.0"
+# and so repeated the model verbatim; the model field already says that.
+#
+# Rooms are prefixed because the device list is flat: "Toilet" on its own
+# says nothing about what reports it, and the unit/room nesting only shows
+# on a device's own page. The cost is that every room entity's id carries
+# the prefix too (`sensor.healthbox_toilet_temperature`), since Home
+# Assistant builds an entity id from its device's name - a deliberate
+# trade of brevity for being able to tell at a glance whose room it is.
+UNIT_DEVICE_NAME = "Healthbox"
+ROOM_DEVICE_NAME = f"{UNIT_DEVICE_NAME} - {{room}}"
+
 # Airflow is reported to the tenth of a m3/h but is nowhere near that
 # stable; a whole number is what the Renson app shows too.
 AIRFLOW_DISPLAY_PRECISION = 0

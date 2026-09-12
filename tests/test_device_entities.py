@@ -816,3 +816,55 @@ async def test_only_a_vanished_room_device_can_be_deleted(
         name="Removed vent",
     )
     assert await async_remove_config_entry_device(hass, entry, stale) is True
+
+
+async def test_device_names_say_which_unit_a_room_belongs_to(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """The device list is flat: "Toilet" on its own says nothing about what
+    reports it, and the unit/room nesting only shows on a device's own page.
+
+    The unit is "Healthbox" rather than the device's own `description`,
+    which reads "Healthbox 3.0" and so repeated the model field verbatim.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    registry = dr.async_get(hass)
+    names = {
+        device.name
+        for device in dr.async_entries_for_config_entry(registry, entry.entry_id)
+    }
+
+    assert "Healthbox" in names
+    assert "Healthbox - Toilet" in names
+    assert "Healthbox - Bathroom" in names
+    # The old bare-room name is gone, not merely joined.
+    assert "Toilet" not in names
+
+
+async def test_a_rooms_entity_ids_carry_the_prefix(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """Home Assistant builds an entity id from its device's name, so the
+    prefix is the price of the device list being readable.
+
+    Pinned here because it is the visible half of the trade: a room
+    reading is `sensor.healthbox_toilet_temperature`, not
+    `sensor.toilet_temperature`.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    assert hass.states.get("sensor.healthbox_toilet_temperature") is not None
+    assert hass.states.get("sensor.toilet_temperature") is None

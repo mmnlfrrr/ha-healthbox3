@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Devices are named `Healthbox` and `Healthbox - <room>`.** The unit
+  used to take the name the device gives itself, which reads "Healthbox
+  3.0" and so repeated the model field verbatim; each room took its bare
+  name, "Toilet". The device list is flat, so a bare room name said
+  nothing about what reports it - the unit/room nesting only shows on a
+  device's own page.
+
+  The cost is the visible half of the trade: Home Assistant builds an
+  entity id from its device's name, so a room reading is now
+  `sensor.healthbox_toilet_temperature` rather than
+  `sensor.toilet_temperature`. **Existing installs are unaffected** - an
+  entity id is derived once, when the entity is first created - so this
+  only changes what a fresh install gets. Renaming a device afterwards
+  offers to bring its entity ids along.
 - Dutch calls a ventilated room a *ruimte* everywhere except one label,
   which said *Kamersymbool* - one word out of step with the five around
   it. Now `Ruimtesymbool`.

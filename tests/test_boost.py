@@ -29,8 +29,8 @@ from .conftest import setup_integration
 # Slug de l'''appareil principal. Les entités de pièce n'''en dépendent plus :
 # chaque pièce est son propre appareil, donc leur identifiant commence
 # directement par le nom de la pièce (voir entity.py).
-_PREFIX = "healthbox_3_0"
-_ROOM1_ENTITY = "fan.toilet_boost"
+_PREFIX = "healthbox"
+_ROOM1_ENTITY = "fan.healthbox_toilet_boost"
 _ALL_ENTITY = f"fan.{_PREFIX}_boost_all"
 
 
@@ -386,7 +386,7 @@ async def test_boost_fan_guards_against_a_room_removed_from_the_device(
     coordinator.async_update_listeners()
     await hass.async_block_till_done()
 
-    entity_id = "fan.toilet_boost"
+    entity_id = "fan.healthbox_toilet_boost"
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
             "fan", "turn_on", {"entity_id": entity_id}, blocking=True
@@ -608,7 +608,7 @@ async def test_only_the_room_that_differs_changes_scale(
     await hass.services.async_call(
         "fan",
         "turn_on",
-        {"entity_id": "fan.bathroom_boost", "percentage": 75},
+        {"entity_id": "fan.healthbox_bathroom_boost", "percentage": 75},
         blocking=True,
     )
 
@@ -664,7 +664,7 @@ async def test_a_fan_says_what_its_full_slider_asks_for(hass, mock_api_client, v
     )
 
     assert hass.states.get(_ROOM1_ENTITY).attributes["level_max"] == "270%"
-    assert hass.states.get("fan.bathroom_boost").attributes["level_max"] == "200%"
+    assert hass.states.get("fan.healthbox_bathroom_boost").attributes["level_max"] == "200%"
 
 
 async def test_a_reconfigured_room_follows_its_new_ceiling(

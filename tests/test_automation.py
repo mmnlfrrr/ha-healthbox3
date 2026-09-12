@@ -196,7 +196,7 @@ async def test_automation_hitting_removed_room_logs_error_and_does_not_call_devi
     coordinator.async_update_listeners()
     await hass.async_block_till_done()
 
-    entity_id = "fan.toilet_boost"
+    entity_id = "fan.healthbox_toilet_boost"
 
     with caplog.at_level(logging.ERROR):
         await _fire_automation(

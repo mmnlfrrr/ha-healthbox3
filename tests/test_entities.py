@@ -15,7 +15,7 @@ from .conftest import setup_integration
 
 # The device name ("Healthbox 3.0" in both fixtures) becomes an entity_id
 # slug prefix once has_entity_name groups every entity under one device.
-_PREFIX = "healthbox_3_0"
+_PREFIX = "healthbox"
 
 
 async def test_room_sensors_report_values_and_empty_co2_is_unavailable(
@@ -29,17 +29,17 @@ async def test_room_sensors_report_values_and_empty_co2_is_unavailable(
         boost_status=boost_status,
     )
 
-    temp = hass.states.get("sensor.toilet_temperature")
+    temp = hass.states.get("sensor.healthbox_toilet_temperature")
     assert temp is not None
     assert float(temp.state) == pytest.approx(22.0)
 
     # room 1's CO2 sensor has an empty `parameter` dict on real hardware.
-    co2 = hass.states.get("sensor.toilet_co2")
+    co2 = hass.states.get("sensor.healthbox_toilet_co2")
     assert co2 is not None
     assert co2.state == "unavailable"
 
     # room 3's CO2 sensor does report.
-    co2_room3 = hass.states.get("sensor.guest_room_co2")
+    co2_room3 = hass.states.get("sensor.healthbox_guest_room_co2")
     assert co2_room3.state == "500.0"
 
 
@@ -55,7 +55,7 @@ async def test_room_airflow_sensor_reports_percentage_of_nominal(
         boost_status=boost_status,
     )
 
-    airflow = hass.states.get("sensor.toilet_airflow")
+    airflow = hass.states.get("sensor.healthbox_toilet_airflow")
     assert airflow is not None
     assert float(airflow.state) == pytest.approx(20.0)
 
@@ -78,9 +78,9 @@ async def test_room_airflow_sensor_not_created_without_nominal_or_flow_rate(
         boost_status=boost_status,
     )
 
-    assert hass.states.get("sensor.toilet_airflow") is None
+    assert hass.states.get("sensor.healthbox_toilet_airflow") is None
     # Other rooms, unaffected, still get their airflow sensor.
-    assert hass.states.get("sensor.bathroom_airflow") is not None
+    assert hass.states.get("sensor.healthbox_bathroom_airflow") is not None
 
 
 async def test_room_airflow_sensor_not_created_with_non_numeric_nominal(
@@ -102,8 +102,8 @@ async def test_room_airflow_sensor_not_created_with_non_numeric_nominal(
         boost_status=boost_status,
     )
 
-    assert hass.states.get("sensor.toilet_airflow") is None
-    assert hass.states.get("sensor.bathroom_airflow") is not None
+    assert hass.states.get("sensor.healthbox_toilet_airflow") is None
+    assert hass.states.get("sensor.healthbox_bathroom_airflow") is not None
 
 
 async def test_global_aqi_sensor_has_main_pollutant_and_room_attributes(
@@ -137,7 +137,7 @@ async def test_room_aqi_sensor_has_qualification_attribute(
         boost_status=boost_status,
     )
 
-    room_aqi = hass.states.get("sensor.toilet_air_quality_index")
+    room_aqi = hass.states.get("sensor.healthbox_toilet_air_quality_index")
     assert room_aqi is not None
     assert float(room_aqi.state) == pytest.approx(10.0)
     assert room_aqi.attributes["qualification"] == "very_good"
@@ -158,7 +158,7 @@ async def test_room_and_global_aqi_level_sensors_report_qualification_state(
         boost_status=boost_status,
     )
 
-    room_level = hass.states.get("sensor.toilet_aqi_level")
+    room_level = hass.states.get("sensor.healthbox_toilet_aqi_level")
     assert room_level is not None
     assert room_level.state == "very_good"
 
@@ -356,7 +356,7 @@ async def test_profile_select_reports_current_option(
         boost_status=boost_status,
     )
 
-    state = hass.states.get("select.toilet_profile")
+    state = hass.states.get("select.healthbox_toilet_profile")
     assert state is not None
     assert state.state == "health"
     assert set(state.attributes["options"]) == {"eco", "health", "intense"}
@@ -374,7 +374,7 @@ async def test_profile_select_not_created_without_api_key(
         boost_status=boost_status,
     )
 
-    assert hass.states.get("select.toilet_profile") is None
+    assert hass.states.get("select.healthbox_toilet_profile") is None
 
 
 async def test_profile_select_change_calls_api(hass, mock_api_client, v2_data, boost_status):
@@ -389,7 +389,7 @@ async def test_profile_select_change_calls_api(hass, mock_api_client, v2_data, b
     await hass.services.async_call(
         "select",
         "select_option",
-        {"entity_id": "select.toilet_profile", "option": "eco"},
+        {"entity_id": "select.healthbox_toilet_profile", "option": "eco"},
         blocking=True,
     )
 
@@ -419,7 +419,7 @@ async def test_profile_select_becomes_unavailable_when_room_removed_from_device(
     coordinator.async_update_listeners()
     await hass.async_block_till_done()
 
-    assert hass.states.get("select.toilet_profile").state == "unavailable"
+    assert hass.states.get("select.healthbox_toilet_profile").state == "unavailable"
 
 
 async def test_demand_control_switch_reports_state(

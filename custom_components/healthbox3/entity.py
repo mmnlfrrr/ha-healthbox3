@@ -32,7 +32,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import Room
-from .const import DOMAIN
+from .const import DOMAIN, ROOM_DEVICE_NAME, UNIT_DEVICE_NAME
 from .coordinator import (
     Healthbox3ConfigEntry,
     Healthbox3DataUpdateCoordinator,
@@ -135,7 +135,7 @@ def unit_device_info(
         identifiers={(DOMAIN, serial)},
         manufacturer="Renson",
         model="Healthbox 3.0",
-        name=coordinator.data.healthbox.description,
+        name=UNIT_DEVICE_NAME,
         serial_number=serial,
     )
     if info is None:
@@ -181,7 +181,7 @@ def _room_device(
         identifiers={(DOMAIN, f"{serial}_room{room.id}")},
         manufacturer="Renson",
         model="Air valve",
-        name=room.name,
+        name=ROOM_DEVICE_NAME.format(room=room.name),
         via_device_id=coordinator.unit_device_id,
     )
 

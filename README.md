@@ -429,9 +429,9 @@ anything else is shown against the unit rather than blamed on a room.
 
 ## Examples
 
-Entity IDs below assume the device's default name ("Healthbox 3.0" -
-adjust the `healthbox_3_0` prefix if you've renamed the device or its
-entities).
+Entity IDs below assume the default device names - `Healthbox` for the
+unit, `Healthbox - <room>` for each room. Adjust the prefix if you have
+renamed a device or its entities.
 
 **Boost a room automatically when its humidity spikes** (e.g. a shower):
 
@@ -439,12 +439,12 @@ entities).
 alias: "Boost bathroom when humidity is high"
 triggers:
   - trigger: numeric_state
-    entity_id: sensor.healthbox_3_0_bathroom_humidity
+    entity_id: sensor.healthbox_bathroom_humidity
     above: 70
 actions:
   - action: fan.turn_on
     target:
-      entity_id: fan.healthbox_3_0_bathroom_boost
+      entity_id: fan.healthbox_bathroom_boost
     data:
       percentage: 100
       preset_mode: "30 min"
@@ -458,12 +458,12 @@ than triggering each room separately:
 alias: "Boost all rooms on poor whole-house air quality"
 triggers:
   - trigger: numeric_state
-    entity_id: sensor.healthbox_3_0_air_quality_index
+    entity_id: sensor.healthbox_air_quality_index
     above: 60
 actions:
   - action: fan.turn_on
     target:
-      entity_id: fan.healthbox_3_0_boost_all
+      entity_id: fan.healthbox_boost_all
     data:
       percentage: 75
       preset_mode: "1 hour"
@@ -483,7 +483,7 @@ triggers:
 actions:
   - action: select.select_option
     target:
-      entity_id: select.healthbox_3_0_bedroom_profile
+      entity_id: select.healthbox_bedroom_profile
     data:
       option: "{{ 'health' if trigger.now.hour == 7 else 'eco' }}"
 ```
