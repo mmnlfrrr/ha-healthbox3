@@ -11,7 +11,7 @@ from .conftest import setup_integration
 
 # The device name ("Healthbox 3.0" in both fixtures) becomes an entity_id
 # slug prefix once has_entity_name groups every entity under one device.
-_PREFIX = "healthbox"
+_PREFIX = "healthbox_global"
 
 
 async def test_global_minimum_number_reports_state(

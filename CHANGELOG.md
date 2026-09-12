@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Devices are named `Healthbox` and `Healthbox - <room>`.** The unit
+- **Devices are named `Healthbox - Global` and `Healthbox - <room>`.** The unit
   used to take the name the device gives itself, which reads "Healthbox
   3.0" and so repeated the model field verbatim; each room took its bare
-  name, "Toilet". The device list is flat, so a bare room name said
+  name, "Toilet". One prefix now covers the installation, and what follows
+  it says which device this is: "Global" for the unit, the room for
+  everything else. The device list is flat, so a bare room name said
   nothing about what reports it - the unit/room nesting only shows on a
   device's own page.
 
@@ -322,10 +324,13 @@ on an active API key.
 
   Shown as-is that read as a fault on a device that is not only fine but
   demonstrably online: a validated API key requires exactly the internet
-  access it was denying. The sensor is now reported only on a unit
-  actually attached over Wi-Fi, and unavailable otherwise - the device
-  offers no way to know. `Connection type` sits beside it and says
-  ETHERNET, which is the explanation.
+  access it was denying.
+
+  The entity is now only created on a unit actually attached over Wi-Fi,
+  rather than created and left permanently unavailable - one that can
+  never hold a meaningful value is worse than none at all, sitting in
+  every list and every search result inviting the question of what broke.
+  `Connection type` answers for a wired unit instead.
 - **Boost no longer disappears on a decision tree that answers without
   it.** Reading boost out of `/v2/decision` made it possible to lose every
   room's boost at once, where losing it used to take its own endpoint

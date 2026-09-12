@@ -53,7 +53,19 @@ async def async_setup_entry(
 
     if coordinator.use_v2:
         entities.append(Healthbox3ProblemBinarySensor(coordinator, serial))
-        entities.append(Healthbox3InternetBinarySensor(coordinator, serial))
+        # Only on a unit actually attached over Wi-Fi. The reading comes
+        # from the Wi-Fi client's own status, which says nothing about an
+        # Ethernet cable, so on a wired unit the entity could never hold a
+        # meaningful value - and an entity that can never answer is worse
+        # than no entity: it sits in every list and every search result
+        # reading "unavailable", inviting the question of what broke.
+        #
+        # Read once, at setup: a unit does not move between a cable and a
+        # radio while running, and the one thing that does it - somebody
+        # rewiring it - is a reload anyway.
+        info = coordinator.data.global_info
+        if info is not None and (info.interface_type or "").upper() == INTERFACE_TYPE_WIFI:
+            entities.append(Healthbox3InternetBinarySensor(coordinator, serial))
 
     async_add_entities(entities)
 
@@ -127,15 +139,14 @@ class Healthbox3InternetBinarySensor(Healthbox3Entity, BinarySensorEntity):
     the advanced-access sensor above goes off, this is the first place to
     look.
 
-    Only ever reported on a unit attached over Wi-Fi. The figure comes
-    from `/renson_core/v1/wifi/client/status`, which describes the Wi-Fi
+    Only created on a unit attached over Wi-Fi. The figure comes from
+    `/renson_core/v1/wifi/client/status`, which describes the Wi-Fi
     *client* - so on a unit wired over Ethernet it answers "no connection"
     about a radio that is simply switched off, saying nothing whatsoever
     about the cable. Shown as-is, that read as a fault on a device that is
     not only fine but demonstrably online, since a validated API key
-    requires exactly the internet access it was denying. Unavailable is
-    the honest answer: the device offers no way to know. `Connection type`
-    sits beside it and says ETHERNET, which is the explanation.
+    requires exactly the internet access it was denying. `Connection type`
+    answers for a wired unit instead.
     """
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
@@ -152,13 +163,15 @@ class Healthbox3InternetBinarySensor(Healthbox3Entity, BinarySensorEntity):
     @property
     @override
     def available(self) -> bool:
-        """Return whether this unit is on Wi-Fi and reported its state."""
-        info = self.coordinator.data.global_info
+        """Return whether the device reported its internet state.
+
+        Nothing about the interface here: this entity only exists on a
+        unit that was attached over Wi-Fi when the platform was set up -
+        see async_setup_entry.
+        """
         wifi = self.coordinator.data.wifi
         return (
             super().available
-            and info is not None
-            and (info.interface_type or "").upper() == INTERFACE_TYPE_WIFI
             and wifi is not None
             and wifi.internet_connection is not None
         )

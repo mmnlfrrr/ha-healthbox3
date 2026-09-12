@@ -17,7 +17,7 @@ import logging
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from homeassistant.const import STATE_ON, STATE_UNAVAILABLE
+from homeassistant.const import STATE_ON
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from custom_components.healthbox3 import api as api_mod
@@ -472,7 +472,9 @@ async def test_internet_is_not_reported_when_the_interface_is_unknown(
     Wi-Fi endpoint describes how this unit is attached or an idle radio.
 
     Reporting its answer anyway is what produced a "Disconnected" reading
-    on a wired unit, so not knowing has to read as not knowing.
+    on a wired unit, so the entity is not created at all rather than left
+    permanently unavailable - which would sit in every list and every
+    search result inviting the question of what broke.
     """
     await setup_integration(
         hass,
@@ -483,8 +485,7 @@ async def test_internet_is_not_reported_when_the_interface_is_unknown(
         wifi=wifi_status,
     )
 
-    state = _state(hass, "binary_sensor", v2_data.serial, "internet_connection")
-    assert state.state == STATE_UNAVAILABLE
+    assert _state(hass, "binary_sensor", v2_data.serial, "internet_connection") is None
 
 
 async def test_advanced_api_binary_sensor_exists_without_a_key(
@@ -848,7 +849,7 @@ async def test_device_names_say_which_unit_a_room_belongs_to(
         for device in dr.async_entries_for_config_entry(registry, entry.entry_id)
     }
 
-    assert "Healthbox" in names
+    assert "Healthbox - Global" in names
     assert "Healthbox - Toilet" in names
     assert "Healthbox - Bathroom" in names
     # The old bare-room name is gone, not merely joined.
@@ -887,6 +888,9 @@ async def test_internet_is_not_reported_on_a_wired_unit(
     fault-looking reading on a device that is not only fine but
     demonstrably online: a validated API key requires exactly the internet
     access it was denying.
+
+    An entity that could never hold a meaningful value is not created at
+    all; `Connection type` answers for a wired unit instead.
     """
     mock_api_client.async_get_global = AsyncMock(
         return_value=api_mod.GlobalInfo(
@@ -906,11 +910,9 @@ async def test_internet_is_not_reported_on_a_wired_unit(
         boost_status=boost_status,
     )
 
-    state = _state(hass, "binary_sensor", v2_data.serial, "internet_connection")
-    assert state is not None, "the entity still exists"
-    assert state.state == STATE_UNAVAILABLE
+    assert _state(hass, "binary_sensor", v2_data.serial, "internet_connection") is None
 
-    # The sensor that does answer for a wired unit still says so.
+    # The sensor that does answer for a wired unit is there instead.
     connection = _state(hass, "sensor", v2_data.serial, "connection_type")
     assert connection.state == "ETHERNET"
 

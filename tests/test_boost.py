@@ -29,7 +29,7 @@ from .conftest import setup_integration
 # Slug de l'''appareil principal. Les entités de pièce n'''en dépendent plus :
 # chaque pièce est son propre appareil, donc leur identifiant commence
 # directement par le nom de la pièce (voir entity.py).
-_PREFIX = "healthbox"
+_PREFIX = "healthbox_global"
 _ROOM1_ENTITY = "fan.healthbox_toilet_boost"
 _ALL_ENTITY = f"fan.{_PREFIX}_boost_all"
 

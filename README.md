@@ -251,7 +251,7 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `Wi-Fi status` | The device's Wi-Fi client status, with SSID as an attribute - diagnostic entity, requires an active API key |
 | `binary_sensor` | `Problem` | On while the device reports any error - the boolean companion to `Device errors`, requires an active API key |
 | `binary_sensor` | `Advanced API access` | Whether privileged (v2) access is currently working - diagnostic entity, always created |
-| `binary_sensor` | `Internet connection` | Whether the device reports internet access. Only on a unit attached over Wi-Fi: the figure comes from the Wi-Fi client's own status, which says nothing about an Ethernet cable, so a wired unit reports unavailable rather than "disconnected" - diagnostic entity, requires an active API key |
+| `binary_sensor` | `Internet connection` | Whether the device reports internet access. **Only created on a unit attached over Wi-Fi**: the figure comes from the Wi-Fi client's own status, which says nothing about an Ethernet cable - `Connection type` answers for a wired unit instead. Diagnostic entity, requires an active API key |
 | `select` | `<room> Profile` | eco/health/intense - only created with an active API key |
 | `fan` | `<room> Boost` | Boost for that room - see "Boost control" below |
 | `fan` | `Boost all` | Boost for every room at once, at one shared level/duration - on only when every room currently reports boost enabled |
@@ -429,8 +429,8 @@ anything else is shown against the unit rather than blamed on a room.
 
 ## Examples
 
-Entity IDs below assume the default device names - `Healthbox` for the
-unit, `Healthbox - <room>` for each room. Adjust the prefix if you have
+Entity IDs below assume the default device names - `Healthbox - Global`
+for the unit, `Healthbox - <room>` for each room. Adjust the prefix if you have
 renamed a device or its entities.
 
 **Boost a room automatically when its humidity spikes** (e.g. a shower):
@@ -458,12 +458,12 @@ than triggering each room separately:
 alias: "Boost all rooms on poor whole-house air quality"
 triggers:
   - trigger: numeric_state
-    entity_id: sensor.healthbox_air_quality_index
+    entity_id: sensor.healthbox_global_air_quality_index
     above: 60
 actions:
   - action: fan.turn_on
     target:
-      entity_id: fan.healthbox_boost_all
+      entity_id: fan.healthbox_global_boost_all
     data:
       percentage: 75
       preset_mode: "1 hour"
