@@ -109,6 +109,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Diagnostics per device, not only per integration.** The Download
+  diagnostics button on a room's device page now answers with that room
+  only: its parsed state, boost status, staged boost level and duration,
+  its boost ceiling and its CO2 demand settings. The unit's own page
+  answers with what describes the appliance as a whole - decision
+  settings, Breeze, telemetry, Wi-Fi, errors, identity - without the
+  per-room noise.
+
+  With a device per room, "this room reads wrong" is the shape most bug
+  reports take, and the config entry's dump answered it with every other
+  room attached. That dump is unchanged and still one click away, on the
+  integration rather than the device. A device left behind by a vent the
+  unit no longer reports says exactly that, which is usually the bug being
+  reported.
 - **A system health page** (**Settings** → **System** → **Repairs** → ⋮ →
   **System information**), answering the first round of every support
   exchange without anyone having to produce a diagnostics file: whether

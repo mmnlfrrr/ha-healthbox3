@@ -591,10 +591,15 @@ integration adds a row there with what it can see of the device right now -
 whether it answers at all, its firmware version, whether privileged (v2)
 access is active, how often it is being polled, whether the last poll
 worked, and how many rooms came back. That page carries nothing
-identifying, so it is safe to screenshot into a forum thread; for the full
-picture - every endpoint's parsed response - use **Download diagnostics**
-on the device page instead, which redacts the identifying fields but is a
-file you attach deliberately rather than a screen you show.
+identifying, so it is safe to screenshot into a forum thread.
+
+For the full picture, use **Download diagnostics**, which redacts the
+identifying fields but is a file you attach deliberately rather than a
+screen you show. Where you press it decides what you get: on a **room's
+device**, that room alone - its readings, boost, boost ceiling and CO2
+demand; on the **unit's device**, what describes the appliance as a whole;
+on the **integration entry**, every endpoint's parsed response for every
+room at once.
 
 **Setup fails with "Failed to connect to the device."** Confirm the IP is
 reachable from Home Assistant (not just from your phone/laptop - a VLAN or

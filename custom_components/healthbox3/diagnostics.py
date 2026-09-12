@@ -8,8 +8,11 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.const import CONF_API_KEY, CONF_HOST
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntry
 
-from .coordinator import Healthbox3ConfigEntry
+from .api import Room
+from .const import DOMAIN
+from .coordinator import Healthbox3ConfigEntry, Healthbox3DataUpdateCoordinator
 
 # Anything that could identify this device or its owner: the config entry's
 # own host/key, the device's serial/warranty numbers (top-level and
@@ -98,4 +101,88 @@ async def async_get_config_entry_diagnostics(
         },
         "boost_all_params": asdict(coordinator.boost_all_params),
     }
+    return async_redact_data(diagnostics, TO_REDACT)
+
+
+def _room_id(device: DeviceEntry, serial: str) -> int | None:
+    """Return the room a device stands for, or None for the unit itself.
+
+    A room's device is identified as `<serial>_room<id>` and the unit's as
+    just `<serial>` - see entity.py. Anything else (a device left behind
+    by an older version, say) reads as the unit, which is the safe way
+    round: the unit's dump is the one that describes the whole install.
+    """
+    for domain, identifier in device.identifiers:
+        if domain != DOMAIN:
+            continue
+        _, separator, suffix = identifier.partition(f"{serial}_room")
+        if separator and suffix.isdigit():
+            return int(suffix)
+    return None
+
+
+def _room_diagnostics(
+    coordinator: Healthbox3DataUpdateCoordinator, room: Room
+) -> dict[str, Any]:
+    """Return everything known about one room."""
+    data = coordinator.data
+    boost = data.boost.get(room.id)
+    decision = data.room_decisions.get(room.id)
+    params = coordinator.boost_params.get(room.id)
+    return {
+        "room": asdict(room),
+        "boost": asdict(boost) if boost is not None else None,
+        "boost_params": asdict(params) if params is not None else None,
+        "boost_level_max": coordinator.level_max(room.id),
+        "room_decision": asdict(decision) if decision is not None else None,
+    }
+
+
+async def async_get_device_diagnostics(
+    hass: HomeAssistant, entry: Healthbox3ConfigEntry, device: DeviceEntry
+) -> dict[str, Any]:
+    """Return diagnostics for one device.
+
+    With a device per room, "this room reads wrong" is the shape most bug
+    reports take, and the config entry's dump answers it by including
+    every other room too - seven rooms' worth of readings to find the one
+    being asked about. This narrows it to the room whose page the button
+    was pressed on.
+
+    The unit's own device is not a room, so it gets what describes the
+    appliance as a whole: the decision settings, telemetry, Wi-Fi, errors
+    and identity, without the per-room noise. The full dump is still one
+    click away, on the integration entry rather than the device.
+    """
+    coordinator = entry.runtime_data
+    data = coordinator.data
+    serial = data.healthbox.serial
+
+    room_id = _room_id(device, serial)
+    if room_id is not None:
+        room = next((r for r in data.healthbox.rooms if r.id == room_id), None)
+        diagnostics: dict[str, Any] = (
+            _room_diagnostics(coordinator, room)
+            if room is not None
+            # A device for a room the unit has stopped reporting: saying
+            # so is the answer, and it is usually the bug being reported.
+            else {"room_id": room_id, "room": None, "reported_by_device": False}
+        )
+    else:
+        diagnostics = {
+            "use_v2": coordinator.use_v2,
+            "healthbox": {
+                key: value
+                for key, value in asdict(data.healthbox).items()
+                if key != "rooms"
+            },
+            "decision": _dump(data.decision),
+            "breeze": _dump(data.breeze),
+            "global_info": _dump(data.global_info),
+            "errors": [asdict(error) for error in data.errors],
+            "device": _dump(data.device),
+            "wifi": _dump(data.wifi),
+            "boost_all_params": asdict(coordinator.boost_all_params),
+        }
+
     return async_redact_data(diagnostics, TO_REDACT)
