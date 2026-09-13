@@ -118,6 +118,9 @@
       },
       "energy": {
         "default": "mdi:meter-electric"
+      },
+      "room_boost_end": {
+        "default": "mdi:fan-clock"
       }
     },
     "select": {

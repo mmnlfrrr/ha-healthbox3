@@ -29,6 +29,7 @@ ICONS_PATH = (
 EXTRA_SENSOR_KEYS = {
     "room_airflow",
     "room_airflow_rate",
+    "room_boost_end",
     "room_nominal_airflow",
     "room_valve_pressure",
     "room_valve_port",

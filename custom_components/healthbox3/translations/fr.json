@@ -189,6 +189,9 @@
       "room_airflow_rate": {
         "name": "Débit mesuré"
       },
+      "room_boost_end": {
+        "name": "Fin du boost"
+      },
       "room_nominal_airflow": {
         "name": "Débit nominal"
       },

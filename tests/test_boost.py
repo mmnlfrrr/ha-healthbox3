@@ -1,6 +1,7 @@
 """Tests for boost control: per-room and boost-all fan entities."""
 
 from __future__ import annotations
+from homeassistant.helpers import entity_registry as er
 
 import copy
 import logging
@@ -13,6 +14,7 @@ from homeassistant.exceptions import HomeAssistantError
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
 from custom_components.healthbox3 import api as api_mod
+from custom_components.healthbox3.const import DOMAIN
 from custom_components.healthbox3.const import BOOST_LEVEL_MAX
 from custom_components.healthbox3.coordinator import _level_ceiling
 from custom_components.healthbox3.fan import (
@@ -145,8 +147,20 @@ async def test_boost_fan_seeded_from_device_defaults(hass, mock_api_client, v1_d
     assert state.attributes["level"] == "100%"
 
 
-async def test_boost_fan_reports_on_with_rescaled_percentage(hass, mock_api_client, v1_data):
-    active = _boost(True, default_level=105.0, default_timeout=900, remaining=300)
+async def test_boost_fan_reports_the_level_it_is_actually_running_at(
+    hass, mock_api_client, v1_data
+):
+    """The running level, not the one staged for next time.
+
+    A boost can be started from anywhere - Renson's app, the device's own
+    web UI, this integration's all-rooms fan - and then the two differ.
+    Reporting the staged one is how a boost running at 200% showed as
+    47% here: 100% staged, rescaled onto a 10-200 range.
+
+    The staged level is deliberately set to something else below, so that
+    a regression cannot pass by coincidence.
+    """
+    active = _boost(True, level=200.0, default_level=100.0, remaining=300)
     await setup_integration(
         hass,
         mock_api_client,
@@ -158,8 +172,31 @@ async def test_boost_fan_reports_on_with_rescaled_percentage(hass, mock_api_clie
 
     state = hass.states.get(_ROOM1_ENTITY)
     assert state.state == "on"
-    assert state.attributes["percentage"] == 50
+    # 200 on a 10-200 scale is the top of it.
+    assert state.attributes["percentage"] == 100
+    assert state.attributes["level"] == "200%"
     assert state.attributes["remaining"] == 300
+
+
+async def test_boost_fan_falls_back_to_the_staged_level_when_off(
+    hass, mock_api_client, v1_data
+):
+    """Nothing is running, so there is no running level to report - the
+    staged one is the only answer, and `percentage` is 0 either way.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+        boost_status=_boost(False, level=200.0, default_level=105.0),
+    )
+
+    state = hass.states.get(_ROOM1_ENTITY)
+    assert state.state == "off"
+    assert state.attributes["percentage"] == 0
+    assert state.attributes["level"] == "105%"
 
 
 async def test_boost_fan_turn_on_uses_current_settings(hass, mock_api_client, v1_data, boost_status):
@@ -696,3 +733,60 @@ async def test_a_reconfigured_room_follows_its_new_ceiling(
     await hass.async_block_till_done()
 
     assert coordinator.level_max(1) == 270.0
+
+
+async def test_boost_end_sensor_counts_down_and_holds_steady(
+    hass, mock_api_client, v1_data
+):
+    """The device counts down in seconds; Home Assistant renders a
+    countdown from a timestamp. So the end time is what is published -
+    a tile then shows "in 5 minutes" and keeps ticking between polls.
+
+    It must also hold still. Recomputing `now + remaining` every poll
+    lands a second or two apart each time even while nothing changes, and
+    republishing that would fill the recorder with jitter.
+    """
+    entry = await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+        boost_status=_boost(True, remaining=300),
+    )
+
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{v1_data.serial}_room1_boost_end"
+    )
+    assert entity_id is not None
+    first = hass.states.get(entity_id).state
+    assert first not in ("unknown", "unavailable")
+
+    # A poll later the device says one second less; the end time is the
+    # same moment and must not move.
+    mock_api_client.async_get_boost = AsyncMock(
+        return_value=_boost(True, remaining=299)
+    )
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == first
+
+
+async def test_boost_end_sensor_is_unavailable_when_no_boost_is_running(
+    hass, mock_api_client, v1_data
+):
+    """There is no end time for something that is not going to end."""
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v1_data.serial,
+        api_key=None,
+        healthbox_data=v1_data,
+        boost_status=_boost(False, remaining=0),
+    )
+
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{v1_data.serial}_room1_boost_end"
+    )
+    assert hass.states.get(entity_id).state == "unavailable"

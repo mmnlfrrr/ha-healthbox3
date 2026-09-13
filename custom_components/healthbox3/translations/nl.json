@@ -189,6 +189,9 @@
       "room_airflow_rate": {
         "name": "Luchtdebiet"
       },
+      "room_boost_end": {
+        "name": "Einde boost"
+      },
       "room_nominal_airflow": {
         "name": "Nominaal luchtdebiet"
       },

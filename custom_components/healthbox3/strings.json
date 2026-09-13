@@ -189,6 +189,9 @@
       "room_airflow_rate": {
         "name": "Airflow rate"
       },
+      "room_boost_end": {
+        "name": "Boost ends"
+      },
       "room_nominal_airflow": {
         "name": "Nominal airflow"
       },

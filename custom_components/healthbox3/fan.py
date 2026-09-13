@@ -201,6 +201,17 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
     def _remaining(self) -> int | None:
         return None
 
+    def _live_level(self) -> float | None:
+        """Return the level boost is *actually* running at, if known.
+
+        Distinct from `self._params.level`, which is what will be sent the
+        next time boost is started. The two differ whenever a boost was
+        started from somewhere else - Renson's own app, the device's web
+        UI, or this integration's all-rooms fan - and that is exactly when
+        a user looks at Home Assistant to see what is going on.
+        """
+        return None
+
     def _extra_available(self) -> bool:
         return True
 
@@ -224,10 +235,20 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
     @property
     @override
     def percentage(self) -> int:
-        """Return the boost level rescaled to 0-100, or 0 if boost is off."""
+        """Return the boost level rescaled to 0-100, or 0 if boost is off.
+
+        The *running* level while a boost is running, falling back to the
+        staged one only when the device does not say. A fan reporting the
+        level it would use next, while running at another, is simply
+        wrong: a boost started at 200% showed as 47% here, because 100%
+        staged on a 10-200 scale is 47% of it.
+        """
         if not self._is_active():
             return 0
-        return min(100, max(1, _level_to_percentage(self._params.level, self._level_max)))
+        level = self._live_level()
+        if level is None:
+            level = self._params.level
+        return min(100, max(1, _level_to_percentage(level, self._level_max)))
 
     @property
     @override
@@ -239,8 +260,11 @@ class _Healthbox3BoostFan(Healthbox3Entity, RestoreEntity, FanEntity):
     @override
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the real (unscaled) boost level and, if known, remaining time."""
+        live = self._live_level() if self._is_active() else None
         attrs: dict[str, Any] = {
-            "level": f"{self._params.level:.0f}%",
+            # What is running, when something is; what would be sent
+            # otherwise. Renson's own app shows exactly this one number.
+            "level": f"{live if live is not None else self._params.level:.0f}%",
             # What 100% on this fan's slider actually asks for. It is not
             # the same figure on every room, so leaving it out would make
             # the slider unreadable on the rooms that differ.
@@ -381,6 +405,11 @@ class Healthbox3RoomBoostFan(_Healthbox3BoostFan):
         return status.remaining if status is not None else None
 
     @override
+    def _live_level(self) -> float | None:
+        status = self._boost_status()
+        return status.level if status is not None else None
+
+    @override
     def _extra_available(self) -> bool:
         return self._boost_status() is not None
 
@@ -412,6 +441,27 @@ class Healthbox3AllBoostFan(_Healthbox3BoostFan):
     @override
     def _is_active(self) -> bool:
         return _all_rooms_active(self.coordinator)
+
+    @override
+    def _live_level(self) -> float | None:
+        """Return the running level, but only if every room agrees on it.
+
+        This one fan stands for every room at once, and the rooms can be
+        boosting at different levels - one started here, another from
+        Renson's app. There is no single honest number for that, so it
+        falls back to the staged level rather than picking a room's and
+        presenting it as the answer.
+        """
+        levels = {status.level for status in self.coordinator.data.boost.values()}
+        return levels.pop() if len(levels) == 1 else None
+
+    @override
+    def _remaining(self) -> int | None:
+        """Return the remaining time, but only if every room agrees - same
+        reasoning as `_live_level`.
+        """
+        remaining = {status.remaining for status in self.coordinator.data.boost.values()}
+        return remaining.pop() if len(remaining) == 1 else None
 
     @override
     def _extra_available(self) -> bool:

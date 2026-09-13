@@ -10,6 +10,7 @@ it runs both at setup and for any room that appears later.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import override
 
 from homeassistant.components.sensor import (
@@ -51,6 +52,8 @@ from .coordinator import Healthbox3DataUpdateCoordinator
 from .entity import Healthbox3Entity, RoomRef
 from .icon_set import icon_name
 from .zone_icons import FALLBACK_ICON, ROOM_SYMBOL_TO_ICON
+
+from homeassistant.util import dt as dt_util
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -161,6 +164,66 @@ def _room_airflow_percentage(room: Room) -> float | None:
     return flow_rate / nominal * 100
 
 
+# A boost end time is recomputed from "seconds remaining" on every poll,
+# so it lands a second or two apart each time even while nothing changes.
+# Republishing that would fill the recorder with a timestamp that jitters
+# rather than moves. Anything inside this window is treated as the same
+# end time; a boost that is restarted moves it by minutes and updates.
+_BOOST_END_TOLERANCE = timedelta(seconds=30)
+
+
+class Healthbox3RoomBoostEndSensor(Healthbox3Entity, SensorEntity):
+    """When this room's boost stops, as a timestamp.
+
+    The device counts down in seconds, which is the shape Renson's own
+    app shows ("15 min remaining"). Published as the *end time* rather
+    than the remaining seconds, because that is the one Home Assistant
+    renders as a live countdown - a tile shows "in 15 minutes" and keeps
+    counting between polls, where a seconds-remaining number would sit
+    still for fifteen of them and then jump.
+
+    Unavailable while no boost is running: there is no end time for
+    something that is not going to end.
+    """
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_translation_key = "room_boost_end"
+
+    def __init__(
+        self,
+        coordinator: Healthbox3DataUpdateCoordinator,
+        serial: str,
+        room_id: int,
+        room_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator, serial, room=RoomRef(id=room_id, name=room_name)
+        )
+        self._room_id = room_id
+        self._attr_unique_id = f"{serial}_room{room_id}_boost_end"
+        self._end: datetime | None = None
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Return whether a boost is currently running in this room."""
+        return super().available and self.native_value is not None
+
+    @property
+    @override
+    def native_value(self) -> datetime | None:
+        """Return when the running boost stops, or None if none is."""
+        status = self.coordinator.data.boost.get(self._room_id)
+        if status is None or not status.enable or status.remaining <= 0:
+            self._end = None
+            return None
+        end = dt_util.utcnow() + timedelta(seconds=status.remaining)
+        if self._end is None or abs(end - self._end) > _BOOST_END_TOLERANCE:
+            self._end = end
+        return self._end
+
+
 def _room_sensors(
     coordinator: Healthbox3DataUpdateCoordinator, serial: str, room: Room
 ) -> list[Healthbox3Entity]:
@@ -197,6 +260,11 @@ def _room_sensors(
                 coordinator, serial, room.id, room.name
             )
         )
+    # Unconditional: a room that has a boost fan has a boost end time the
+    # moment someone starts one, and every room gets a boost fan.
+    entities.append(
+        Healthbox3RoomBoostEndSensor(coordinator, serial, room.id, room.name)
+    )
     if room_symbol(room) is not None:
         entities.append(
             Healthbox3RoomSymbolSensor(coordinator, serial, room.id, room.name)

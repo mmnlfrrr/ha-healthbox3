@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A boost fan reports the level it is actually running at.** It
+  reported the level staged for the next start instead, and the two are
+  the same number only until a boost is started from somewhere else -
+  Renson's app, the device's own web UI, the all-rooms fan. A boost
+  running at 200% showed as **47%**, because 100% staged on a 10-200
+  scale is 47% of it. The `level` attribute follows the same rule, so it
+  now reads what Renson's app reads.
+
+  The all-rooms fan answers only when every room agrees: it stands for
+  all of them at once, and rooms boosting at different levels have no
+  single honest number, so it falls back to the staged one rather than
+  picking a room's and presenting it as the answer.
 - **The three duct pressures are computed from the duct model instead of
   read back from the device.** `Duct network pressure`, `Exhaust
   pressure` and every room's `Valve pressure` came from
@@ -251,6 +263,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A `Boost ends` sensor per room**, so a running boost shows how long
+  it has left - the "15 min remaining" Renson's own app shows, which
+  Home Assistant had nowhere to display. Published as the end
+  *timestamp* rather than the seconds the device counts down in: that is
+  what Home Assistant renders as a live countdown, so a tile reads "in
+  15 minutes" and keeps ticking between polls, where a seconds figure
+  would sit still for fifteen of them and then jump. Unavailable while
+  no boost is running - there is no end time for something that is not
+  going to end.
 - **Diagnostics per device, not only per integration.** The Download
   diagnostics button on a room's device page now answers with that room
   only: its parsed state, boost status, staged boost level and duration,
