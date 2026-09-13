@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Error codes `100`, `101` and `102` name a subsystem each - the control
+  valves for the first two, the valve collectors for the third - rather
+  than all three reading as one combined "control valves / valve
+  collectors". The table came from Renson's public help centre; the
+  error-code index inside Renson's own mobile app lists the same sixteen
+  prefixes and splits those first three, which both confirms the rest of
+  the table and sharpens its opening.
 - **The unit's firmware version, and its product id, are on the device
   entry.** Home Assistant has a place for both - `sw_version`, shown in
   the device header, and `model_id` beside the model - and this

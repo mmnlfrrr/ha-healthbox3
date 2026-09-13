@@ -398,17 +398,24 @@ def _parse_decision_tree(raw: dict[str, Any]) -> DecisionTree:
 # Sourced from Renson's public help-center/FAQ error-code index
 # (faqs.ri4stat.eu), a genuinely separate source from the device's own
 # local API and not one of the two official PDFs (neither PDF mentions
-# error codes at all). /v1/error has only ever been observed empty on
-# real hardware (see DeviceError's docstring), so this table is a
-# well-evidenced best guess, not confirmed against a real populated
-# response - it may be incomplete or slightly wrong until an actual
-# error occurs and gets cross-checked. Deliberately just a short
-# category label per prefix, not Renson's own (copyrighted) per-code
-# troubleshooting text.
+# error codes at all).
+#
+# Cross-checked since against the error-code index inside Renson's own
+# mobile app, which lists the same sixteen prefixes with the same
+# subsystem per prefix. That confirmed the table and sharpened its first
+# three entries: 100 and 101 are the control valves, 102 the valve
+# collectors, where the help-center wording had left all three reading
+# as one combined "control valves / valve collectors".
+#
+# /v1/error has still only ever been observed empty on real hardware
+# (see DeviceError's docstring), so this remains a label attached to a
+# code rather than something checked against a real populated response.
+# Deliberately just a short category per prefix, not Renson's own
+# (copyrighted) per-code troubleshooting text.
 _ERROR_CATEGORIES: dict[str, str] = {
-    "100": "Control valves / valve collectors",
-    "101": "Control valves / valve collectors",
-    "102": "Control valves / valve collectors",
+    "100": "Control valves",
+    "101": "Control valves",
+    "102": "Valve collectors",
     "103": "Power",
     "104": "Valve collectors",
     "105": "Air leaks",
