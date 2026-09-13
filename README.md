@@ -539,6 +539,19 @@ nothing is written back to it and switching back and forth costs nothing.
 
 ## Known limitations
 
+- **The pressure readings are only there on a unit that has one to
+  give.** `Duct network pressure`, `Exhaust pressure` and each room's
+  `Valve pressure` all come from the device's `cmode_pressures` block -
+  the calibration solver's own state. A unit that is not mid-sweep
+  answers with the structure intact and every number zeroed, and those
+  zeros are reported as unknown rather than as 0 Pa: air does not flow
+  through a duct with no pressure drop across it, so a flat zero would
+  be a physically impossible constant dressed up as a measurement. On
+  such a unit those entities sit at "unavailable"; the duct model's
+  conductances beside them are unaffected and always reported.
+
+  `Fan pressure` is a different thing entirely - the fan's own live
+  sensor - and is not affected.
 - **Automatic network discovery is unreliable on some networks.** Setup
   tries a UDP broadcast first, but delivery is commonly blocked by AP
   client isolation, IGMP snooping, or VLAN segmentation - it didn't work at

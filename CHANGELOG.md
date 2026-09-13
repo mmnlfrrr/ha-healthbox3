@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A pressure of exactly zero is reported as unknown, not as 0 Pa.**
+  `Duct network pressure`, `Exhaust pressure` and every room's `Valve
+  pressure` come from `cmode_pressures` - `cmode_` being calibration
+  mode, the same prefix as `c_mode_power`, which this client already
+  refuses to expose because it only means anything mid-sweep. The
+  pressures turn out to be the same kind of value: a real unit, freshly
+  recommissioned and running normally, answers with the block intact and
+  every number zeroed - total, exhaust and all three valves at 0.0 Pa -
+  while moving 66 m3/h, and while the conductance block beside it stays
+  fully populated.
+
+  Air does not flow through a duct with no pressure drop across it, so
+  that zero is the device saying it has nothing to report. Published as
+  a reading it was a precise-looking, physically impossible constant,
+  and a flat zero line on a graph reads as data - worse than an entity
+  that admits it doesn't know. A unit that does carry a sweep's results
+  still publishes every one of them unchanged.
 - **A device error now says what actually broke.** Renson documents
   sixteen error codes, each with a one-line description of the fault in
   eight languages; the catalogue shipped with Renson Installer 5.1.1 is

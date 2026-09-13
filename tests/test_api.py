@@ -1049,3 +1049,64 @@ def test_room_valve_port_returns_none_when_unusable():
     assert api_mod.room_valve_port(room(valve=api_mod.Parameter(value=None))) is None
     # Booleans are ints in Python; a True valve must not become port 1.
     assert api_mod.room_valve_port(room(valve=api_mod.Parameter(value=True))) is None
+
+
+def test_a_zeroed_pressure_block_reports_nothing_rather_than_zero():
+    """`cmode_pressures` is the calibration solver's own state, and a unit
+    that is not mid-sweep answers with the structure intact and every
+    number zeroed - confirmed on real hardware, freshly recommissioned
+    and running normally, moving 66 m3/h while reporting 0.0 Pa across
+    every duct.
+
+    Air does not flow through a duct with no pressure drop across it, so
+    that zero is "nothing to report", not a measurement. Published as-is
+    it would put a physically impossible constant on a graph, where a
+    flat line reads as data; the entities go unavailable instead.
+
+    The conductances in the same response are untouched: they are a
+    standing property of the ducts and a real unit always carries them.
+    """
+    raw = {
+        "fan": {"pressure": 22.6},
+        "conductance": {
+            "c_collector": {"1": {"c_ij": {"0": 16.22}}},
+            "c_out": 27.2,
+            "c_leak": 1.53,
+        },
+        "cmode_pressures": {
+            "p_collector": {"1": {"0": 0.0}},
+            "p_tot": 0.0,
+            "p_exh": 0.0,
+        },
+    }
+
+    device = api_mod._parse_device(raw)
+
+    assert device.pressure_total is None
+    assert device.pressure_exhaust is None
+    assert device.valve_pressure == {}
+    # Everything that is a real reading still arrives.
+    assert device.fan.pressure == 22.6
+    assert device.valve_conductance == {1: 16.22}
+    assert device.conductance_out == 27.2
+    assert device.conductance_leak == 1.53
+
+
+def test_a_populated_pressure_block_is_published_unchanged():
+    """Only the zeros become "unknown" - a unit that does carry a sweep's
+    results keeps every one of them, which is the whole reason these
+    entities exist.
+    """
+    raw = {
+        "cmode_pressures": {
+            "p_collector": {"1": {"0": 34.2}, "2": {"0": 19.5}},
+            "p_tot": 61.76,
+            "p_exh": 27.56,
+        },
+    }
+
+    device = api_mod._parse_device(raw)
+
+    assert device.pressure_total == 61.76
+    assert device.pressure_exhaust == 27.56
+    assert device.valve_pressure == {1: 34.2, 2: 19.5}

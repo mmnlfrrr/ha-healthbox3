@@ -544,6 +544,13 @@ class DeviceTelemetry:
     `conductance` and `pressures` hold the device's calibrated duct model
     (see README): conductance C in the solver's Q = C x sqrt(dP). Both are
     keyed by collector PORT number, not room id - see ROOM_PARAM_VALVE.
+
+    The two are not equally dependable, though they arrive together. The
+    conductances are a standing property of the ducts and a real unit
+    always carries them; the pressures come from `cmode_pressures`,
+    which a unit outside a calibration sweep answers entirely zeroed -
+    see `_reported_pressure`, which turns those zeros back into "not
+    reported" so they never reach an entity as a reading.
     """
 
     fan: FanTelemetry = field(default_factory=FanTelemetry)
@@ -568,14 +575,47 @@ def _optional_float(value: Any) -> float | None:
     return float(value)
 
 
+def _reported_pressure(value: Any) -> float | None:
+    """Return a `cmode_pressures` reading, or None when there isn't one.
+
+    That whole block is the calibration solver's own state - `cmode_` is
+    "calibration mode", the same prefix as `c_mode_power`, which this
+    client already refuses to expose because it only means anything while
+    a sweep is running. The pressures turn out to be the same kind of
+    value: a real unit, freshly recommissioned and running normally,
+    answers with the structure intact and every number zeroed - `p_tot`,
+    `p_exh` and every port at 0.0 - while the `conductance` block beside
+    it stays fully populated.
+
+    Zero is not a pressure. That unit was moving 66 m3/h through those
+    ducts as it answered 0.0 Pa across all of them, and air does not flow
+    through a duct with no pressure drop across it: 0.0 is the device
+    saying it has nothing to report, not a measurement of nothing.
+
+    Publishing it anyway would put a precise-looking, physically
+    impossible constant on a graph, which is worse than an entity that
+    admits it doesn't know - a flat zero line reads as data. So a zero
+    becomes "unknown" and the entity goes unavailable, while a unit that
+    does carry a sweep's results publishes them unchanged.
+    """
+    pressure = _optional_float(value)
+    if pressure is None or pressure == 0.0:
+        return None
+    return pressure
+
+
 def _parse_collector_block(
-    raw: Any, extract: Callable[[Any], Any]
+    raw: Any,
+    extract: Callable[[Any], Any],
+    convert: Callable[[Any], float | None] = _optional_float,
 ) -> dict[int, float]:
     """Parse one of `/v1/device`'s per-valve blocks into {port: value}.
 
     Ports whose value is missing, non-numeric, or whose key isn't an
     integer are skipped rather than raising: an unbuilt or uncalibrated
-    port is a normal state, not a malformed response.
+    port is a normal state, not a malformed response. `convert` is what
+    decides "usable" - the pressure block passes `_reported_pressure`,
+    which also skips zeros.
     """
     if not isinstance(raw, dict):
         return {}
@@ -585,7 +625,7 @@ def _parse_collector_block(
             port_number = int(port)
         except (TypeError, ValueError):
             continue
-        value = _optional_float(extract(entry))
+        value = convert(extract(entry))
         if value is not None:
             parsed[port_number] = value
     return parsed
@@ -606,8 +646,8 @@ def _parse_device(raw: dict[str, Any]) -> DeviceTelemetry:
         power=_optional_float(raw.get("power")),
         conductance_out=_optional_float(conductance.get("c_out")),
         conductance_leak=_optional_float(conductance.get("c_leak")),
-        pressure_total=_optional_float(pressures.get("p_tot")),
-        pressure_exhaust=_optional_float(pressures.get("p_exh")),
+        pressure_total=_reported_pressure(pressures.get("p_tot")),
+        pressure_exhaust=_reported_pressure(pressures.get("p_exh")),
         valve_conductance=_parse_collector_block(
             conductance.get("c_collector"),
             lambda entry: (entry or {}).get("c_ij", {}).get(COLLECTOR_PRIMARY_KEY),
@@ -615,6 +655,7 @@ def _parse_device(raw: dict[str, Any]) -> DeviceTelemetry:
         valve_pressure=_parse_collector_block(
             pressures.get("p_collector"),
             lambda entry: (entry or {}).get(COLLECTOR_PRIMARY_KEY),
+            _reported_pressure,
         ),
     )
 
