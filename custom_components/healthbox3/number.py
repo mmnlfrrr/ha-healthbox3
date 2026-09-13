@@ -160,14 +160,25 @@ class Healthbox3RoomCO2ThresholdNumber(Healthbox3Entity, NumberEntity):
     change.
 
     Reads/writes `demand.CO2.static.maximum`, not `minimum`. Confirmed on
-    real hardware: a fresh `/v2/decision/room` capture showed every
-    CO2-enabled room at minimum=650.0/maximum=800.0, and the Renson app
-    displayed 800 for all of them at that same moment - the app shows
-    `maximum`, reversing this entity's original binding (built against
-    `config_rest.js`'s installer-page logic, which binds its CO2
-    threshold field to `minimum` instead - the installer page and the
-    consumer app disagree on which field is "the" threshold, and the app
-    is what end users actually see).
+    real hardware twice, at two different settings:
+
+    - minimum=650.0/maximum=800.0, with the Renson app showing 800;
+    - after a recommissioning moved the pair, minimum=800.0/maximum=950.0,
+      with the app showing 950 and the device's own installer web page
+      showing 800 under the label "CO2 Minimum Threshold".
+
+    So the two Renson UIs bind to opposite ends of the same pair, and
+    this follows the app - what end users actually see - rather than
+    `config_rest.js`'s installer page, which is where this entity's
+    original binding to `minimum` came from.
+
+    Both observations also show the pair 150 ppm apart, which is why
+    writing one end shifts the other rather than stretching the span:
+    it is a ramp band, not two independent settings. The app's own
+    wording for it ("the airflow will only increase once the threshold is
+    reached") describes the bottom of that band while displaying the top
+    - Renson's inconsistency, not one to reproduce by picking the field
+    the sentence implies over the field the app actually shows.
     """
 
     _attr_translation_key = "room_co2_threshold"
