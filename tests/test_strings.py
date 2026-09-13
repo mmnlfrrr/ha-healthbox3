@@ -20,6 +20,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from custom_components.healthbox3 import api as api_mod
 from custom_components.healthbox3.api import AQI_QUALIFICATION_LEVELS
 from custom_components.healthbox3.const import PROFILES
 
@@ -149,3 +150,67 @@ def test_every_select_option_is_translated():
 
     assert set(options) == set(PROFILES)
     assert all(label and not label.islower() for label in options.values())
+
+
+def test_every_documented_error_code_has_a_title_in_every_language():
+    """Renson documents sixteen error codes, each with its own one-line
+    description of the fault. Each gets its own repair-issue key, so the
+    issue's title is that description rather than the generic "Healthbox
+    reported an error".
+
+    Checked against the category table rather than a second list of
+    codes: `error_issue_key` derives the key from that same table, so a
+    prefix added there without a title here would silently raise issues
+    under a translation key that does not exist - which Home Assistant
+    renders as the raw key.
+    """
+    for path in (STRINGS_PATH, *TRANSLATION_PATHS):
+        issues = _load_json(path)["issues"]
+        for prefix in api_mod._ERROR_CATEGORIES:
+            key = api_mod.error_issue_key(f"{prefix}99")
+            assert key in issues, f"{path.name} is missing {key}"
+            assert issues[key]["title"].strip(), f"{path.name}: {key} has no title"
+
+
+def test_an_undocumented_error_code_falls_back_to_the_generic_issue():
+    """A code outside the sixteen still raises an issue - one that says
+    only what the device said, which is better than a missing title.
+    """
+    assert api_mod.error_issue_key("99999") == "device_error"
+    assert "device_error" in _load_json(STRINGS_PATH)["issues"]
+
+
+CATALOGUE_PATH = Path(__file__).parent.parent / "docs" / "renson-error-catalogue.json"
+
+_CATALOGUE_LANGUAGES = {
+    "en": TRANSLATIONS_EN_PATH,
+    "fr": TRANSLATIONS_FR_PATH,
+    "nl": TRANSLATIONS_NL_PATH,
+}
+
+
+def test_shipped_error_titles_match_rensons_catalogue_verbatim():
+    """docs/renson-error-catalogue.json is the source of record for both
+    the category table and the shipped issue titles, and this is what
+    makes that claim checkable rather than decorative.
+
+    Verbatim on purpose: these are Renson's own translations of Renson's
+    own error catalogue. An edit here - a reworded French title, a
+    "helpful" clarification - would be this project inventing wording for
+    a fault it has never seen, in a language it does not vouch for.
+    """
+    catalogue = _load_json(CATALOGUE_PATH)["errors"]
+    assert len(catalogue) == len(api_mod._ERROR_CATEGORIES)
+
+    for entry in catalogue:
+        code = entry["code"]
+        assert api_mod._categorize_error_code(code).casefold() == (
+            entry["subsystem"].casefold()
+        ), f"{code}: category disagrees with the catalogue"
+
+        key = api_mod.error_issue_key(code)
+        for language, path in _CATALOGUE_LANGUAGES.items():
+            shipped = _load_json(path)["issues"][key]["title"]
+            assert shipped == entry["titles"][language], (
+                f"{code}: {path.name} title differs from the catalogue"
+            )

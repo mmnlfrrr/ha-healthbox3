@@ -275,6 +275,70 @@
     "device_error": {
       "title": "Healthbox reported a {severity} error",
       "description": "The Healthbox reported a {category} error (code {code}): {description}\n\nReported at {time}. This can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_100": {
+      "title": "Too few control valves in the configuration",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_101": {
+      "title": "More than 11 control valves in the configuration",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_102": {
+      "title": "More than 2 valve collectors in the configuration",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_103": {
+      "title": "Healthbox 3.0 has insufficient power for the configuration",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_104": {
+      "title": "No control valve(s) found on the valve collector",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_105": {
+      "title": "One or multiple air leaks in the configuration",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_106": {
+      "title": "No kitchen control valve in the configuration with cooker hood",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_107": {
+      "title": "Multiple kitchen control valves in the configuration with cooker hood",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_108": {
+      "title": "The fan cannot be controlled",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_109": {
+      "title": "Air passage in the exhaust ductwork is nil",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_110": {
+      "title": "Required nominal flow rate at the extraction point is unlikely to be reached",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_111": {
+      "title": "Electrical connection with control valve disrupted",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_112": {
+      "title": "An error has occurred during measurements",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_113": {
+      "title": "The air through the control valve is nil",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_300": {
+      "title": "Healthbox 3.0 fire protection mode active",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
+    },
+    "device_error_301": {
+      "title": "No synchronisation of the internal clock of Healthbox 3.0",
+      "description": "Code {code}, reported at {time}: {description}\n\nThis can't be cleared from Home Assistant - use the Renson app or the device itself to acknowledge or resolve it. Check the Renson app or contact your installer for detailed troubleshooting steps. This issue will disappear automatically once the device stops reporting it."
     }
   },
   "system_health": {

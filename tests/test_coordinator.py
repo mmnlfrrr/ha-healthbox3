@@ -918,3 +918,46 @@ async def test_a_unit_that_has_not_said_is_still_asked(
     await coordinator.async_refresh()
     await coordinator.async_refresh()
     assert mock_api_client.async_get_wifi_status.call_count == 2
+
+
+async def test_a_documented_error_code_gets_its_own_issue_title(
+    hass, v2_data, boost_status
+):
+    """A repair issue that says what actually broke.
+
+    Renson documents sixteen error codes, each with a one-line
+    description of the fault, in eight languages. A code among them is
+    raised under its own translation key, so the issue's title reads
+    "The fan cannot be controlled" instead of "Healthbox reported a
+    critical error" - which is the difference between an issue a user
+    can act on and one they can only forward to their installer.
+
+    The placeholders are unchanged: the code, the device's own
+    description and the timestamp are still carried, because the title
+    describes the *class* of fault and those describe this occurrence
+    of it.
+    """
+    entry = make_config_entry(hass, serial=v2_data.serial)
+    client = _client()
+    client.async_get_v2_data_current.return_value = v2_data
+    client.async_get_boost.return_value = boost_status
+    client.async_get_errors.return_value = [
+        api_mod.DeviceError(
+            association_id="abc123",
+            code="10899",
+            description="",
+            time="2026-01-15T08:30:00Z",
+            severity="critical",
+            category=api_mod._categorize_error_code("10899"),
+        )
+    ]
+
+    coordinator = Healthbox3DataUpdateCoordinator(hass, entry, client, use_v2=True)
+    await coordinator.async_refresh()
+
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "device_error_abc123")
+    assert issue is not None
+    assert issue.translation_key == "device_error_108"
+    assert issue.translation_placeholders is not None
+    assert issue.translation_placeholders["code"] == "10899"
+    assert issue.translation_placeholders["category"] == "Fan and main PCB"

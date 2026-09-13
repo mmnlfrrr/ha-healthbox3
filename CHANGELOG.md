@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A device error now says what actually broke.** Renson documents
+  sixteen error codes, each with a one-line description of the fault in
+  eight languages; the catalogue shipped with Renson Installer 5.1.1 is
+  now the source of record, kept in `docs/renson-error-catalogue.json`.
+  Each of those codes raises its repair issue under its own translation
+  key, so the issue is titled "The fan cannot be controlled" rather than
+  "Healthbox reported a critical error" - the difference between
+  something a user can act on and something they can only forward to
+  their installer. English, French and Dutch ship Renson's own wording
+  verbatim, and a test holds them to the catalogue character for
+  character. A code outside the sixteen still raises the generic issue.
+
+  The same catalogue confirms the code-prefix category table outright -
+  it is now a third independent source agreeing with the other two - and
+  settles the shape of the codes: five digits, subsystem in the first
+  three, every documented one ending in `99`.
+
+  Renson's per-code troubleshooting prose is deliberately not
+  reproduced: pages of their own documentation, and their app is a tap
+  away.
 - Error codes `100`, `101` and `102` name a subsystem each - the control
   valves for the first two, the valve collectors for the third - rather
   than all three reading as one combined "control valves / valve

@@ -31,6 +31,7 @@ from .api import (
     RoomDecision,
     WifiStatus,
     async_discover_broadcast,
+    error_issue_key,
 )
 from .const import (
     BOOST_DURATION_PRESETS,
@@ -451,6 +452,13 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
         meant to act on. Clearing stays a manual device/Renson-app
         action; these issues exist purely to inform.
 
+        Each issue is raised under its code's own translation key where
+        there is one (see `error_issue_key`), so its title is Renson's
+        own wording for that exact fault - "The fan cannot be
+        controlled" - rather than the generic "Healthbox reported a
+        critical error", which says nothing a user can act on. A code
+        outside the sixteen Renson documents still gets the generic one.
+
         Keyed on `association_id` - its name strongly implies it's the
         device's own per-fault correlation id, but this has never been
         confirmed against a real populated response (see DeviceError's
@@ -470,7 +478,7 @@ class Healthbox3DataUpdateCoordinator(DataUpdateCoordinator[Healthbox3Data]):
                 issue_id,
                 is_fixable=False,
                 severity=_ERROR_SEVERITY.get(error.severity, ir.IssueSeverity.WARNING),
-                translation_key="device_error",
+                translation_key=error_issue_key(error.code),
                 translation_placeholders={
                     "code": error.code,
                     "description": error.description,

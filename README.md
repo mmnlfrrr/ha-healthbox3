@@ -584,14 +584,25 @@ nothing is written back to it and switching back and forth costs nothing.
   or resolve an error; the repair issue and the `Device errors` sensor
   both disappear/update automatically once the device stops reporting it,
   no Home Assistant-side action needed either way.
-- **The error `category` shown alongside a device error's code/description
-  is best-effort, not confirmed against a real device.** It's derived
-  from a code-prefix table sourced from Renson's public help-center/FAQ
-  error index, a separate source from the device's own local API - real
-  device errors have never actually been observed (`/v1/error` has only
-  ever returned empty), so this mapping hasn't been cross-checked against
-  a real populated response. Treat the category as a helpful hint, not a
-  guarantee; the raw code and description are always shown alongside it.
+- **A device error's title and `category` come from Renson's own error
+  catalogue, but have never been seen against a real fault.** The
+  sixteen codes Renson documents each raise a repair issue titled with
+  Renson's own one-line description of that fault, in Renson's own
+  translation - "The fan cannot be controlled", not "Healthbox reported
+  a critical error". The catalogue is in
+  `docs/renson-error-catalogue.json` and agrees across three independent
+  sources (Renson's public help centre, the error index in their
+  consumer app, and the catalogue shipped with Renson Installer 5.1.1).
+
+  What has never happened is a real device error: `/v1/error` has only
+  ever returned empty on real hardware, so none of this has been checked
+  against a populated response. A code outside the sixteen still raises
+  an issue, titled generically. The raw code, the device's own
+  description and the timestamp are always shown alongside either way.
+
+  Renson's per-code troubleshooting steps are deliberately not
+  reproduced - that is pages of their own documentation, and their app
+  is where it belongs.
 - **The AQI `qualification` band (and the `AQI level` sensors showing that
   same band as their state) isn't necessarily comparable across rooms, or
   between a room and the whole-house value.** Per Renson's own guidance,

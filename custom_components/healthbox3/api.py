@@ -395,23 +395,30 @@ def _parse_decision_tree(raw: dict[str, Any]) -> DecisionTree:
 
 
 # Maps a 5-digit error code's first 3 digits to a short category name.
-# Sourced from Renson's public help-center/FAQ error-code index
-# (faqs.ri4stat.eu), a genuinely separate source from the device's own
-# local API and not one of the two official PDFs (neither PDF mentions
-# error codes at all).
+# First sourced from Renson's public help-center/FAQ error-code index
+# (faqs.ri4stat.eu), then confirmed twice over: by the error-code index
+# inside Renson's own consumer app, and by the error catalogue shipped
+# with Renson Installer 5.1.1, which carries all sixteen codes with a
+# subsystem and a one-line title each, in eight languages. All three
+# sources agree on every prefix.
 #
-# Cross-checked since against the error-code index inside Renson's own
-# mobile app, which lists the same sixteen prefixes with the same
-# subsystem per prefix. That confirmed the table and sharpened its first
-# three entries: 100 and 101 are the control valves, 102 the valve
-# collectors, where the help-center wording had left all three reading
-# as one combined "control valves / valve collectors".
+# The codes themselves are five digits. Every code in Renson's own
+# catalogue ends in `99`, and the subsystem is carried entirely by the
+# first three digits - hence categorising on the prefix rather than the
+# whole code. The obvious reading of the trailing pair is "which valve",
+# with 99 meaning "none in particular", but nothing confirms that and
+# nothing here depends on it.
 #
 # /v1/error has still only ever been observed empty on real hardware
 # (see DeviceError's docstring), so this remains a label attached to a
 # code rather than something checked against a real populated response.
-# Deliberately just a short category per prefix, not Renson's own
-# (copyrighted) per-code troubleshooting text.
+#
+# The per-code *titles* live in strings.json, as one repair-issue
+# translation key per prefix (see `error_issue_key`) - that is what puts
+# Renson's own wording, in Renson's own translations, in front of the
+# user. Their troubleshooting prose is deliberately not reproduced: it is
+# several pages of Renson's own copyrighted documentation, and the app it
+# comes from is a tap away.
 _ERROR_CATEGORIES: dict[str, str] = {
     "100": "Control valves",
     "101": "Control valves",
@@ -441,6 +448,25 @@ def _categorize_error_code(code: str) -> str:
     always-available raw code, not something anything else depends on.
     """
     return _ERROR_CATEGORIES.get(code[:3], "Unknown")
+
+
+def error_issue_key(code: str) -> str:
+    """Return the repair-issue translation key to raise this code under.
+
+    A known prefix gets its own key, whose title is Renson's own one-line
+    description of that fault in the user's own language - "The fan
+    cannot be controlled" rather than "Healthbox reported a critical
+    error". Anything else falls back to the generic key, which says only
+    what the device said.
+
+    Keyed off the same table as the category: a prefix has a title in
+    strings.json exactly when it has a category here, and both are
+    generated from the same sixteen-code catalogue.
+    """
+    prefix = code[:3]
+    if prefix in _ERROR_CATEGORIES:
+        return f"device_error_{prefix}"
+    return "device_error"
 
 
 @dataclass

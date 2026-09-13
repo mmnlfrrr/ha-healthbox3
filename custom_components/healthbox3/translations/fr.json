@@ -275,6 +275,70 @@
     "device_error": {
       "title": "La Healthbox a signalé une erreur {severity}",
       "description": "La Healthbox a signalé une erreur de catégorie {category} (code {code}) : {description}\n\nSignalée à {time}. Cela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_100": {
+      "title": "Trop peu de modules de réglage dans la configuration",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_101": {
+      "title": "Plus de 11 modules de réglage dans la configuration",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_102": {
+      "title": "Plus de 2 collecteurs de ventilation dans la configuration",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_103": {
+      "title": "L'Healthbox 3.0 ne dispose pas d'une puissance suffisante pour la configuration",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_104": {
+      "title": "Pas de module(s) de réglage trouvé(s) sur le collecteur de ventilation",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_105": {
+      "title": "Une ou plusieurs fuites d'air dans la configuration",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_106": {
+      "title": "Pas de module de réglage cuisine dans la configuration avec hotte",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_107": {
+      "title": "Plusieurs modules de réglage de cuisine dans la configuration avec hotte",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_108": {
+      "title": "Le ventilateur ne peut pas être commandé",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_109": {
+      "title": "Le passage de l'air dans le conduit d'évacuation est nul",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_110": {
+      "title": "Il est peu probable que le débit d'air nominal préféré au point d'extraction soit atteint",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_111": {
+      "title": "Raccordement électrique du module de réglage interrompu",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_112": {
+      "title": "Une erreur s'est produite pendant les mesures",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_113": {
+      "title": "L'air ne passe pas par le module de réglage",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_300": {
+      "title": "Mode de protection incendie de l'Healthbox 3.0 actif",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
+    },
+    "device_error_301": {
+      "title": "Pas de synchronisation de l'horloge interne de l'Healthbox 3.0",
+      "description": "Code {code}, signalé à {time} : {description}\n\nCela ne peut pas être effacé depuis Home Assistant - utilisez l'application Renson ou l'appareil lui-même pour la reconnaître ou la résoudre. Consultez l'application Renson ou contactez votre installateur pour des étapes de dépannage détaillées. Ce problème disparaîtra automatiquement dès que l'appareil ne le signalera plus."
     }
   },
   "system_health": {

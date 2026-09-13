@@ -335,14 +335,18 @@ rules:
     # written before GET /v1/error's real shape had been confirmed, and
     # incorrect once it was.
     #
-    # Both the repair issue and sensor.device_errors also surface a
-    # `category` label (api.py's _categorize_error_code, keyed on the
-    # error code's first 3 digits) alongside the raw code/description.
-    # Sourced from Renson's public help-center/FAQ error-code index, a
-    # separate source from the local API and never confirmed against a
-    # real populated /v1/error response - best-effort, not a confirmed
-    # fact; see api.py's _ERROR_CATEGORIES comment and README's
-    # "Known limitations".
+    # Each of the sixteen codes Renson documents raises its issue under
+    # its own translation key (api.py's error_issue_key), so the title is
+    # Renson's own description of that fault in the user's own language,
+    # not "Healthbox reported a critical error". Both the issue and
+    # sensor.device_errors also surface a `category` label
+    # (_categorize_error_code, keyed on the code's first 3 digits)
+    # alongside the raw code/description. Source of record:
+    # docs/renson-error-catalogue.json, from Renson Installer 5.1.1, in
+    # agreement with their public help centre and their consumer app.
+    # Still never confirmed against a real populated /v1/error response -
+    # see README's "Known limitations". A code outside the sixteen falls
+    # back to the generic issue.
   stale-devices: done
     # async_remove_config_entry_device (in __init__.py) allows deleting the
     # device of a room the unit no longer reports, and refuses the unit

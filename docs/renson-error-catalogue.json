@@ -1,0 +1,274 @@
+{
+  "_comment": [
+    "Renson's own error catalogue for the Healthbox 3, as shipped with Renson",
+    "Installer 5.1.1. Titles only: Renson's per-code troubleshooting prose is",
+    "several pages of their own documentation and is deliberately not reproduced",
+    "here - the Renson app shows it, and that is where it belongs.",
+    "",
+    "This is the source of record for two things in the integration:",
+    "  - _ERROR_CATEGORIES in api.py (the `subsystem` column), and",
+    "  - the device_error_<prefix> repair-issue titles in strings.json and",
+    "    translations/*.json, which ship the en/fr/nl columns verbatim.",
+    "",
+    "The five other languages are kept here rather than dropped, so they are",
+    "ready if the integration ever ships those locales. Translations are",
+    "Renson's own and are not to be regenerated.",
+    "",
+    "Codes are five digits; the subsystem is carried by the first three. Every",
+    "code Renson documents ends in 99."
+  ],
+  "product": "HEALTHBOX3",
+  "source": "Renson Installer 5.1.1",
+  "languages": [
+    "de",
+    "en",
+    "es",
+    "fr",
+    "ja",
+    "nl",
+    "ru",
+    "sv"
+  ],
+  "errors": [
+    {
+      "titles": {
+        "de": "Zu wenige Regelventile in der Konfiguration",
+        "en": "Too few control valves in the configuration",
+        "es": "Crítico - 10099: Muy pocas válvulas de control en la configuración",
+        "fr": "Trop peu de modules de réglage dans la configuration",
+        "ja": "分岐構成の制御バルブ数が少なすぎます",
+        "nl": "Te weinig regelmodules in de configuratie",
+        "ru": "Недостаточно регулирующих клапанов в конфигурации",
+        "sv": "Allt för få reglerventiler i konfigurationen"
+      },
+      "code": "10099",
+      "severity": "critical",
+      "subsystem": "control valves"
+    },
+    {
+      "titles": {
+        "de": "Mehr als 11 Regelventile in der Konfiguration",
+        "en": "More than 11 control valves in the configuration",
+        "es": "Crítico - 10199: Más de 11 válvulas de control en la configuración",
+        "fr": "Plus de 11 modules de réglage dans la configuration",
+        "ja": "分岐構成で、11カ所を超える制御バルブ",
+        "nl": "Meer dan 11 regelmodules in de configuratie",
+        "ru": "Более 11 регулирующих клапанов в конфигурации",
+        "sv": "Fler än 11 reglerventiler i konfigurationen"
+      },
+      "code": "10199",
+      "severity": "critical",
+      "subsystem": "control valves"
+    },
+    {
+      "titles": {
+        "de": "Mehr als 2 Ventilkollektoren in der Konfiguration",
+        "en": "More than 2 valve collectors in the configuration",
+        "es": "Crítico - 10299: Más de 2 colectores de válvulas en la configuración",
+        "fr": "Plus de 2 collecteurs de ventilation dans la configuration",
+        "ja": "構成上、3カ所以上のバルブコレクター",
+        "nl": "Meer dan 2 klepcollectoren in de configuratie",
+        "ru": "В конфигурации больше двух клапанных коллекторов",
+        "sv": "Fler än 2 ventilsamlare i konfigurationen"
+      },
+      "code": "10299",
+      "severity": "critical",
+      "subsystem": "valve collectors"
+    },
+    {
+      "titles": {
+        "de": "Die Healthbox 3.0 hat nicht genügend Strom für die Konfiguration",
+        "en": "Healthbox 3.0 has insufficient power for the configuration",
+        "es": "Crítico - 10399: La Healthbox 3.0 no tiene suficiente potencia para la configuración",
+        "fr": "L'Healthbox 3.0 ne dispose pas d'une puissance suffisante pour la configuration",
+        "ja": "Healthbox 3.0に必要な電力が不足しています",
+        "nl": "De Healthbox 3.0 heeft onvoldoende vermogen voor de configuratie",
+        "ru": "Мощность Healthbox 3.0 не достаточна для конфигурации",
+        "sv": "Healthbox 3.0 har inte tillräckligt med ström för konfigurationen"
+      },
+      "code": "10399",
+      "severity": "critical",
+      "subsystem": "power"
+    },
+    {
+      "titles": {
+        "de": "Kein(e) Regelventil(e) am Ventilkollektor gefunden",
+        "en": "No control valve(s) found on the valve collector",
+        "es": "Crítico - 10499: No se han encontrado válvula(s) de control en el colector de válvulas",
+        "fr": "Pas de module(s) de réglage trouvé(s) sur le collecteur de ventilation",
+        "ja": "バルブコレクターに接続される制御バルブが見つかりません",
+        "nl": "Geen regelmodule(s) op de klepcollector gevonden",
+        "ru": "На клапанном коллекторе не обнаружены регулирующие клапаны",
+        "sv": "Ingen/inga reglerventil(er) hittades på ventilsamlaren"
+      },
+      "code": "10499",
+      "severity": "critical",
+      "subsystem": "valve collectors"
+    },
+    {
+      "titles": {
+        "de": "Eine oder mehrere Luftleckagen in der Konfiguration",
+        "en": "One or multiple air leaks in the configuration",
+        "es": "Advertencia - 10599: Una o múltiples fugas de aire en la configuración",
+        "fr": "Une ou plusieurs fuites d'air dans la configuration",
+        "ja": "分岐構成内の1つまたは複数の漏気",
+        "nl": "Een of meerdere luchtlekken in de configuratie",
+        "ru": "Одна или несколько утечек воздуха в конфигурации",
+        "sv": "Ett eller flera luftläckage i konfigurationen"
+      },
+      "code": "10599",
+      "severity": "warning",
+      "subsystem": "air leaks"
+    },
+    {
+      "titles": {
+        "de": "Kein Küchen-Regelventil in der Konfiguration mit Dunstabzugshaube",
+        "en": "No kitchen control valve in the configuration with cooker hood",
+        "es": "Crítico - 10699: No hay válvula de control de cocina en la configuración con campana extractora",
+        "fr": "Pas de module de réglage cuisine dans la configuration avec hotte",
+        "ja": "台所換気扇フード付きの構成ではキッチンを自由に調整できません。",
+        "nl": "Er is geen regelmodule voor de keuken in de configuratie met afzuigkap",
+        "ru": "В конфигурации с кухонной вытяжкой кухонный регулирующий клапан отсутствует",
+        "sv": "Ingen köksreglerventil i en konfiguration med spiskåpa"
+      },
+      "code": "10699",
+      "severity": "critical",
+      "subsystem": "kitchen control valve"
+    },
+    {
+      "titles": {
+        "de": "Mehrere Küchen-Regelventile in der Konfiguration mit Dunstabzugshaube",
+        "en": "Multiple kitchen control valves in the configuration with cooker hood",
+        "es": "Advertencia - 10799: Múltiples válvulas de control de cocina en la configuración con campana extractora",
+        "fr": "Plusieurs modules de réglage de cuisine dans la configuration avec hotte",
+        "ja": "台所換気扇フード付きの構成で、複数のキッチン用制御バルブ",
+        "nl": "Meerdere regelmodules voor de keuken in de configuratie met afzuigkap",
+        "ru": "В конфигурации с кухонной вытяжкой установлено несколько кухонных регулирующих клапанов",
+        "sv": "Flera köksreglerventiler i en konfiguration med spiskåpa"
+      },
+      "code": "10799",
+      "severity": "warning",
+      "subsystem": "kitchen control valve"
+    },
+    {
+      "titles": {
+        "de": "Der Lüfter kann nicht gesteuert werden",
+        "en": "The fan cannot be controlled",
+        "es": "Crítico - 10899: El ventilador no se puede controlar",
+        "fr": "Le ventilateur ne peut pas être commandé",
+        "ja": "ファンの制御ができない",
+        "nl": "De ventilator kan niet worden geregeld",
+        "ru": "Вентилятор не регулируется",
+        "sv": "Fläkten kan inte kontrolleras"
+      },
+      "code": "10899",
+      "severity": "critical",
+      "subsystem": "fan and main PCB"
+    },
+    {
+      "titles": {
+        "de": "Der Luftdurchlass im Abluftkanal ist gleich null",
+        "en": "Air passage in the exhaust ductwork is nil",
+        "es": "El paso de aire en los conductos de escape es nulo",
+        "fr": "Le passage de l'air dans le conduit d'évacuation est nul",
+        "ja": "排気ダクトの空気の通り道がゼロになる",
+        "nl": "Luchtdoorgang in het afvoerkanaal is nihil",
+        "ru": "Проходимость воздуха в вытяжном воздуховоде нулевая",
+        "sv": "Luftpassagen i avgaskanalen är obefintlig"
+      },
+      "code": "10999",
+      "severity": "warning",
+      "subsystem": "control valves"
+    },
+    {
+      "titles": {
+        "de": "Der bevorzugte Nennluftdurchsatz am Absaugpunkt wird wahrscheinlich nicht erreicht",
+        "en": "Required nominal flow rate at the extraction point is unlikely to be reached",
+        "es": "Advertencia - 11099: Es improbable que se alcance el caudal nominal requerido en el punto de extracción",
+        "fr": "Il est peu probable que le débit d'air nominal préféré au point d'extraction soit atteint",
+        "ja": "抽出ポイントでの好ましい公称空気流量に達する可能性は低いです。",
+        "nl": "Het gewenste nominaaldebiet aan het extractiepunt wordt waarschijnlijk niet behaald",
+        "ru": "Предпочтительный номинальный расход воздуха в точке извлечения навряд ли будет достигнут",
+        "sv": "Det är osannolikt att det önskade nominella luftflödet vid extraktionspunkten uppnås"
+      },
+      "code": "11099",
+      "severity": "warning",
+      "subsystem": "control valves"
+    },
+    {
+      "titles": {
+        "de": "Elektrische Verbindung mit dem Regelventil ist unterbrochen",
+        "en": "Electrical connection with control valve disrupted",
+        "es": "Crítico - 11199: Conexión eléctrica con la válvula de control interrumpida",
+        "fr": "Raccordement électrique du module de réglage interrompu",
+        "ja": "制御バルブとの電気接続が遮断された",
+        "nl": "Elektrische aansluiting met regelmodule is verstoord",
+        "ru": "Нарушение электрического соединения с регулирующим клапаном",
+        "sv": "Elektrisk anslutning till reglerventil störs"
+      },
+      "code": "11199",
+      "severity": "critical",
+      "subsystem": "control valves"
+    },
+    {
+      "titles": {
+        "de": "Während der Messung ist ein Fehler aufgetreten",
+        "en": "An error has occurred during measurements",
+        "es": "Crítico - 11299: Se ha producido un error durante las mediciones",
+        "fr": "Une erreur s'est produite pendant les mesures",
+        "ja": "測定中にエラーが発生しました",
+        "nl": "Er heeft zich een fout voorgedaan tijdens de metingen",
+        "ru": "Возникла ошибка при выполнении измерений",
+        "sv": "Ett fel har inträffat under mätningarna"
+      },
+      "code": "11299",
+      "severity": "critical",
+      "subsystem": "measurement error"
+    },
+    {
+      "titles": {
+        "de": "Es fließt keine Luft durch das Regelventil",
+        "en": "The air through the control valve is nil",
+        "es": "Advertencia - 11399: El aire que pasa por la válvula de control es nulo",
+        "fr": "L'air ne passe pas par le module de réglage",
+        "ja": "制御バルブの風量がゼロです",
+        "nl": "Er stroomt geen lucht door de regelmodule",
+        "ru": "Через регулирующий клапан не поступает воздух",
+        "sv": "Luften genom reglerventilen är noll"
+      },
+      "code": "11399",
+      "severity": "warning",
+      "subsystem": "control valves"
+    },
+    {
+      "titles": {
+        "de": "Der Brandschutz-Modus der Healthbox 3.0 ist aktiv",
+        "en": "Healthbox 3.0 fire protection mode active",
+        "es": "Crítico - 30099: Modo de protección contra incendios de la Healthbox 3.0 activo",
+        "fr": "Mode de protection incendie de l'Healthbox 3.0 actif",
+        "ja": "Healthbox 3.0防火モードが有効です",
+        "nl": "De brandbeveiligingsmodus van de Healthbox 3.0",
+        "ru": "Включен режим противопожарной защиты Healthbox 3.0",
+        "sv": "Healthbox 3.0 brandskyddsläge aktivt"
+      },
+      "code": "30099",
+      "severity": "critical",
+      "subsystem": "fire protection mode"
+    },
+    {
+      "titles": {
+        "de": "Keine Synchronisierung der internen Uhr der Healthbox 3.0",
+        "en": "No synchronisation of the internal clock of Healthbox 3.0",
+        "es": "Advertencia - 30199: No hay sincronización del reloj interno de la Healthbox 3.0",
+        "fr": "Pas de synchronisation de l'horloge interne de l'Healthbox 3.0",
+        "ja": "Healthbox 3.0の内部クロックの同期はありません",
+        "nl": "Geen synchronisering van de interne klok van de Healthbox 3.0",
+        "ru": "Отсутствует синхронизация внутренних часов Healthbox 3.0",
+        "sv": "Ingen synkronisering av den interna klockan i Healthbox 3.0"
+      },
+      "code": "30199",
+      "severity": "warning",
+      "subsystem": "clock failure"
+    }
+  ]
+}
