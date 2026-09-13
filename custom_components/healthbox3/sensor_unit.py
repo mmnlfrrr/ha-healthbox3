@@ -43,6 +43,7 @@ from .api import (
     as_float,
     categorize_aqi_quality,
 )
+from .aeraulic import exhaust_pressure, network_pressure
 from .const import (
     AIRFLOW_DISPLAY_PRECISION,
     CONDUCTANCE_UNIT,
@@ -113,13 +114,6 @@ DEVICE_SENSOR_META: tuple[DeviceSensorMeta, ...] = (
         suggested_display_precision=0,
     ),
     DeviceSensorMeta(
-        translation_key="network_pressure",
-        value_fn=lambda device: device.pressure_total,
-        device_class=SensorDeviceClass.PRESSURE,
-        native_unit_of_measurement=UnitOfPressure.PA,
-        suggested_display_precision=1,
-    ),
-    DeviceSensorMeta(
         translation_key="fan_voltage",
         value_fn=lambda device: device.fan.voltage,
         device_class=SensorDeviceClass.VOLTAGE,
@@ -130,14 +124,6 @@ DEVICE_SENSOR_META: tuple[DeviceSensorMeta, ...] = (
     DeviceSensorMeta(
         translation_key="fan_pressure",
         value_fn=lambda device: device.fan.pressure,
-        device_class=SensorDeviceClass.PRESSURE,
-        native_unit_of_measurement=UnitOfPressure.PA,
-        suggested_display_precision=1,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    DeviceSensorMeta(
-        translation_key="exhaust_pressure",
-        value_fn=lambda device: device.pressure_exhaust,
         device_class=SensorDeviceClass.PRESSURE,
         native_unit_of_measurement=UnitOfPressure.PA,
         suggested_display_precision=1,
@@ -315,6 +301,66 @@ class Healthbox3GlobalVentilationLevelSensor(Healthbox3Entity, SensorEntity):
         """Return the current whole-house ventilation level."""
         decision = self.coordinator.data.decision
         return decision.global_ventilation_level if decision is not None else None
+
+
+class _Healthbox3ModelledPressureSensor(Healthbox3Entity, SensorEntity):
+    """Base for the two unit-level pressures the duct model gives.
+
+    Both need the rooms as well as the device - a total over the
+    installation, not a field of one response - which is why neither is a
+    DEVICE_SENSOR_META entry like the readings beside them.
+
+    See aeraulic.py for why these are computed rather than read, and for
+    the check against Renson's own figures.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.PRESSURE
+    _attr_native_unit_of_measurement = UnitOfPressure.PA
+    _attr_suggested_display_precision = 1
+    _unique_id_suffix: str
+
+    def __init__(
+        self, coordinator: Healthbox3DataUpdateCoordinator, serial: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, serial)
+        self._attr_unique_id = f"{serial}_{self._unique_id_suffix}"
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Return whether the duct model can currently answer."""
+        return super().available and self.native_value is not None
+
+
+class Healthbox3NetworkPressureSensor(_Healthbox3ModelledPressureSensor):
+    """Total pressure the fan has to provide at nominal flow, in Pa."""
+
+    _attr_translation_key = "network_pressure"
+    _unique_id_suffix = "network_pressure"
+
+    @property
+    @override
+    def native_value(self) -> float | None:
+        """Return the exhaust duct plus the worst branch."""
+        data = self.coordinator.data
+        return network_pressure(data.healthbox, data.device)
+
+
+class Healthbox3ExhaustPressureSensor(_Healthbox3ModelledPressureSensor):
+    """Pressure drop across the exhaust duct at nominal flow, in Pa."""
+
+    _attr_translation_key = "exhaust_pressure"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _unique_id_suffix = "exhaust_pressure"
+
+    @property
+    @override
+    def native_value(self) -> float | None:
+        """Return the whole installation's flow over the outlet conductance."""
+        data = self.coordinator.data
+        return exhaust_pressure(data.healthbox, data.device)
 
 
 class Healthbox3ConnectionTypeSensor(Healthbox3Entity, SensorEntity):

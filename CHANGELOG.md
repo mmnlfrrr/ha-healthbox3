@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The three duct pressures are computed from the duct model instead of
+  read back from the device.** `Duct network pressure`, `Exhaust
+  pressure` and every room's `Valve pressure` came from
+  `cmode_pressures`, which a real unit - freshly recommissioned and
+  running normally - answers entirely zeroed while the conductances
+  beside it stay populated. They are now evaluated from those
+  conductances: `dP = (Q / C)**2` at nominal flow, with `c_ij` and
+  `c_ai` combined in series, which is the device's own `SerieC`.
+
+  Not a measurement traded for a calculation. On a unit that *does* fill
+  `cmode_pressures` in, every number in it is that same model at nominal
+  flow, reproducible from the conductances to the last published digit -
+  checked in the test suite against a seven-valve capture, and against
+  the figures Renson's own installer app shows for a three-valve
+  installation, which come from a cloud endpoint this now reproduces
+  offline. Same entities, same unique ids, same history, no step in the
+  graph; they simply stop being blank on a unit that publishes zeros.
+
+  What does change is what they mean, and it is worth knowing: these are
+  the pressures **at nominal flow**, so a room throttled to its minimum
+  is not currently seeing its valve pressure. That was already true of
+  the numbers the device published.
 - **A pressure of exactly zero is reported as unknown, not as 0 Pa.**
   `Duct network pressure`, `Exhaust pressure` and every room's `Valve
   pressure` come from `cmode_pressures` - `cmode_` being calibration

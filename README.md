@@ -539,19 +539,21 @@ nothing is written back to it and switching back and forth costs nothing.
 
 ## Known limitations
 
-- **The pressure readings are only there on a unit that has one to
-  give.** `Duct network pressure`, `Exhaust pressure` and each room's
-  `Valve pressure` all come from the device's `cmode_pressures` block -
-  the calibration solver's own state. A unit that is not mid-sweep
-  answers with the structure intact and every number zeroed, and those
-  zeros are reported as unknown rather than as 0 Pa: air does not flow
-  through a duct with no pressure drop across it, so a flat zero would
-  be a physically impossible constant dressed up as a measurement. On
-  such a unit those entities sit at "unavailable"; the duct model's
-  conductances beside them are unaffected and always reported.
+- **The pressures are the ducts' pressures at nominal flow, not live
+  readings.** `Duct network pressure`, `Exhaust pressure` and each
+  room's `Valve pressure` are evaluated from the device's own calibrated
+  duct model rather than read back from it - the same three figures
+  Renson's installer app shows, computed from the same conductances (see
+  `custom_components/healthbox3/aeraulic.py`). A room throttled down to
+  its minimum is not currently seeing its valve pressure; these describe
+  the ducts, and move only when the ducts do or when a recommissioning
+  rewrites a nominal flow.
+
+  They go unavailable, rather than to zero, on a unit that reports no
+  conductances - no API key, or a failed `/v1/device` read.
 
   `Fan pressure` is a different thing entirely - the fan's own live
-  sensor - and is not affected.
+  sensor - and is a real measurement.
 - **Automatic network discovery is unreliable on some networks.** Setup
   tries a UDP broadcast first, but delivery is commonly blocked by AP
   client isolation, IGMP snooping, or VLAN segmentation - it didn't work at

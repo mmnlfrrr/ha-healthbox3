@@ -43,10 +43,13 @@ EXTRA_SENSOR_KEYS = {
     "room_aqi_level",
     "global_aqi_level",
     "global_ventilation_level",
-    "firmware_version",
-    "ip_address",
-    "mac_address",
     "connection_type",
+    # The two unit-level pressures. They left DEVICE_SENSOR_META when
+    # they stopped being a field of one response and became a value the
+    # duct model evaluates over the whole installation (see aeraulic.py),
+    # so this set is now where they are accounted for.
+    "network_pressure",
+    "exhaust_pressure",
     "device_errors",
     "wifi_status",
     "energy",

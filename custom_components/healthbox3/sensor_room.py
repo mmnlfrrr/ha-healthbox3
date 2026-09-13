@@ -37,6 +37,7 @@ from .api import (
     room_symbol,
     room_valve_port,
 )
+from .aeraulic import room_nominal_flow, valve_pressure
 from .const import (
     AIRFLOW_DISPLAY_PRECISION,
     CONDUCTANCE_UNIT,
@@ -119,12 +120,6 @@ ROOM_SENSOR_META: dict[str, RoomSensorMeta] = {
 
 
 
-def _room_nominal_flow(room: Room) -> float | None:
-    """Return a room's nominal (rated reference) flow rate in m3/h."""
-    param = room.parameters.get("nominal")
-    return as_float(param.value) if param is not None else None
-
-
 def _room_current_flow_rate(room: Room) -> float | None:
     """Return a room's current live flow rate in m3/h.
 
@@ -159,7 +154,7 @@ def _room_airflow_percentage(room: Room) -> float | None:
     there's a nonzero floor even at rest - real-world values run roughly
     10-200%, not 0-100.
     """
-    nominal = _room_nominal_flow(room)
+    nominal = room_nominal_flow(room)
     flow_rate = _room_current_flow_rate(room)
     if not nominal or flow_rate is None:
         return None
@@ -196,7 +191,7 @@ def _room_sensors(
         entities.append(
             Healthbox3RoomAirflowRateSensor(coordinator, serial, room.id, room.name)
         )
-    if _room_nominal_flow(room) is not None:
+    if room_nominal_flow(room) is not None:
         entities.append(
             Healthbox3RoomNominalAirflowSensor(
                 coordinator, serial, room.id, room.name
@@ -512,7 +507,7 @@ class Healthbox3RoomNominalAirflowSensor(_Healthbox3RoomValueSensor):
 
     @override
     def _room_value(self, room: Room) -> float | None:
-        return _room_nominal_flow(room)
+        return room_nominal_flow(room)
 
 
 class Healthbox3RoomSymbolSensor(Healthbox3Entity, SensorEntity):
@@ -674,12 +669,23 @@ class _Healthbox3RoomDuctSensor(_Healthbox3RoomValueSensor):
         return self._duct_value(port, device)
 
 
-class Healthbox3RoomValvePressureSensor(_Healthbox3RoomDuctSensor):
-    """The differential pressure across a room's valve, in Pa.
+class Healthbox3RoomValvePressureSensor(_Healthbox3RoomValueSensor):
+    """The pressure drop across a room's duct at its nominal flow, in Pa.
 
     A room needing markedly more pressure than its neighbours for the
     same flow has a longer, narrower or more restricted duct - useful
-    context when its airflow looks low.
+    context when its airflow looks low. The one asking for the most is
+    also what sets the fan's working point (see `network_pressure`).
+
+    Computed from the duct model rather than read from the device: the
+    pressures the device publishes are the calibration solver's scratch
+    space and come back zeroed outside a sweep, while the conductance
+    they would be derived from is always there. See aeraulic.py, which
+    reproduces Renson's own figure for this to every published digit.
+
+    At *nominal* flow, so it does not move when the room throttles down -
+    the same thing Renson's installer app shows, and a property of the
+    duct rather than a live reading.
     """
 
     _attr_translation_key = "room_valve_pressure"
@@ -688,9 +694,11 @@ class Healthbox3RoomValvePressureSensor(_Healthbox3RoomDuctSensor):
     _attr_suggested_display_precision = 1
     _unique_id_suffix = "valve_pressure"
 
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
     @override
-    def _duct_value(self, port: int, device: DeviceTelemetry) -> float | None:
-        return device.valve_pressure.get(port)
+    def _room_value(self, room: Room) -> float | None:
+        return valve_pressure(room, self.coordinator.data.device)
 
 
 class Healthbox3RoomConductanceSensor(_Healthbox3RoomDuctSensor):

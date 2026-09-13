@@ -541,6 +541,14 @@ class DeviceTelemetry:
     value while the device is running its calibration sweep, so as a
     permanently-present entity it would read as a misleading constant.
 
+    Each collector entry carries two conductances, not one: `c_ij` is the
+    duct itself and `c_ai` the branch's other resistance in series with
+    it (10000 on hardware seen so far, i.e. all but negligible). The
+    device's own published pressures are the *series* combination of the
+    two - see aeraulic.py's `series_conductance`, which reproduces them
+    exactly - so both are parsed, and `c_ai` is not dropped as noise just
+    because it is small.
+
     `conductance` and `pressures` hold the device's calibrated duct model
     (see README): conductance C in the solver's Q = C x sqrt(dP). Both are
     keyed by collector PORT number, not room id - see ROOM_PARAM_VALVE.
@@ -560,6 +568,7 @@ class DeviceTelemetry:
     pressure_total: float | None = None
     pressure_exhaust: float | None = None
     valve_conductance: dict[int, float] = field(default_factory=dict)
+    valve_inlet_conductance: dict[int, float] = field(default_factory=dict)
     valve_pressure: dict[int, float] = field(default_factory=dict)
 
 
@@ -578,14 +587,18 @@ def _optional_float(value: Any) -> float | None:
 def _reported_pressure(value: Any) -> float | None:
     """Return a `cmode_pressures` reading, or None when there isn't one.
 
-    That whole block is the calibration solver's own state - `cmode_` is
-    "calibration mode", the same prefix as `c_mode_power`, which this
-    client already refuses to expose because it only means anything while
-    a sweep is running. The pressures turn out to be the same kind of
-    value: a real unit, freshly recommissioned and running normally,
-    answers with the structure intact and every number zeroed - `p_tot`,
-    `p_exh` and every port at 0.0 - while the `conductance` block beside
-    it stays fully populated.
+    A real unit, freshly recommissioned and running normally, answers
+    that block with the structure intact and every number zeroed -
+    `p_tot`, `p_exh` and every port at 0.0 - while the `conductance`
+    block beside it stays fully populated.
+
+    Not a separate measurement lost, as the `cmode_` ("calibration
+    mode") prefix first suggested: on a unit that does fill the block in,
+    every one of its numbers is the duct model evaluated at nominal flow,
+    reproducible to the last digit from the conductances alone (see
+    aeraulic.py). The device is precomputing what it otherwise leaves us
+    to work out, and publishing zeros when it has nothing to precompute
+    from - which is why nothing is exposed from here any more.
 
     Zero is not a pressure. That unit was moving 66 m3/h through those
     ducts as it answered 0.0 Pa across all of them, and air does not flow
@@ -651,6 +664,10 @@ def _parse_device(raw: dict[str, Any]) -> DeviceTelemetry:
         valve_conductance=_parse_collector_block(
             conductance.get("c_collector"),
             lambda entry: (entry or {}).get("c_ij", {}).get(COLLECTOR_PRIMARY_KEY),
+        ),
+        valve_inlet_conductance=_parse_collector_block(
+            conductance.get("c_collector"),
+            lambda entry: (entry or {}).get("c_ai"),
         ),
         valve_pressure=_parse_collector_block(
             pressures.get("p_collector"),

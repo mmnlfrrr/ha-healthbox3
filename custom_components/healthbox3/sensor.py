@@ -24,9 +24,11 @@ from .sensor_unit import (
     Healthbox3DeviceErrorsSensor,
     Healthbox3DeviceSensor,
     Healthbox3EnergySensor,
+    Healthbox3ExhaustPressureSensor,
     Healthbox3GlobalAqiLevelSensor,
     Healthbox3GlobalAqiSensor,
     Healthbox3GlobalVentilationLevelSensor,
+    Healthbox3NetworkPressureSensor,
     Healthbox3WifiStatusSensor,
 )
 
@@ -56,6 +58,11 @@ async def async_setup_entry(
         entities.append(Healthbox3ConnectionTypeSensor(coordinator, serial))
         entities.append(Healthbox3DeviceErrorsSensor(coordinator, serial))
         entities.append(Healthbox3EnergySensor(coordinator, serial))
+        # Not DEVICE_SENSOR_META entries: both are evaluated over the
+        # whole installation, rooms included, rather than read out of one
+        # response. See aeraulic.py.
+        entities.append(Healthbox3NetworkPressureSensor(coordinator, serial))
+        entities.append(Healthbox3ExhaustPressureSensor(coordinator, serial))
         entities.extend(
             Healthbox3DeviceSensor(coordinator, serial, meta)
             for meta in DEVICE_SENSOR_META

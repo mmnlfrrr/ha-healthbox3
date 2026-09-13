@@ -56,15 +56,6 @@
       "global_ventilation_level": {
         "default": "mdi:weather-windy"
       },
-      "firmware_version": {
-        "default": "mdi:chip"
-      },
-      "ip_address": {
-        "default": "mdi:ip-network"
-      },
-      "mac_address": {
-        "default": "mdi:network-outline"
-      },
       "connection_type": {
         "default": "mdi:lan-connect"
       },

@@ -1002,3 +1002,66 @@ async def test_internet_is_reported_on_a_wifi_unit(
 
     state = _state(hass, "binary_sensor", v2_data.serial, "internet_connection")
     assert state.state == STATE_ON
+
+
+async def test_the_pressures_are_modelled_from_the_conductances(
+    hass, mock_api_client, v2_data, boost_status, device_telemetry
+):
+    """The three pressures Renson's installer app shows, from local data.
+
+    The device does publish pressures, in `cmode_pressures`, but a unit
+    outside a calibration sweep answers that block entirely zeroed - so
+    they are computed from the conductance beside it instead, which is
+    always there. aeraulic.py holds the arithmetic to Renson's own
+    figures; this holds the entities to the arithmetic.
+
+    Asserted as "reports a number" rather than against fixed values: the
+    exact figures depend on the fixture's conductances, and pinning them
+    here would only restate test_aeraulic.py in a slower way.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+        device=device_telemetry,
+    )
+
+    total = _state(hass, "sensor", v2_data.serial, "network_pressure")
+    exhaust = _state(hass, "sensor", v2_data.serial, "exhaust_pressure")
+    assert total is not None and exhaust is not None
+    assert float(total.state) > float(exhaust.state) > 0
+
+    # The total is the exhaust plus the single worst branch, so it has to
+    # sit above every one of them - and below their sum, on any
+    # installation with more than one.
+    branches = [
+        float(state.state)
+        for room in v2_data.rooms
+        if (state := _state(hass, "sensor", v2_data.serial, f"room{room.id}_valve_pressure"))
+        is not None
+    ]
+    assert branches
+    assert float(total.state) == pytest.approx(float(exhaust.state) + max(branches))
+
+
+async def test_the_pressures_are_unavailable_without_the_duct_model(
+    hass, mock_api_client, v2_data, boost_status
+):
+    """No `/v1/device` read means no conductances, and nothing to model
+    from. Unavailable, not zero - a duct passing air with no pressure
+    drop across it does not exist.
+    """
+    await setup_integration(
+        hass,
+        mock_api_client,
+        serial=v2_data.serial,
+        healthbox_data=v2_data,
+        boost_status=boost_status,
+    )
+
+    for suffix in ("network_pressure", "exhaust_pressure"):
+        state = _state(hass, "sensor", v2_data.serial, suffix)
+        assert state is not None
+        assert state.state == "unavailable"
