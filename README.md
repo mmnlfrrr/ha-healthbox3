@@ -240,7 +240,7 @@ v1-only functionality and prompted you to reauthenticate with a new key.
 | `sensor` | `Outlet conductance` | The duct model's outlet conductance - diagnostic entity, requires an active API key |
 | `sensor` | `Network leakage` | The duct model's estimated leakage conductance - diagnostic entity, requires an active API key; see [Duct model](#duct-model) |
 | `sensor` | `<room> Airflow rate` | That room's current airflow in m³/h (the absolute counterpart to `<room> Airflow`'s percentage) |
-| `sensor` | `<room> Boost ends` | When that room's running boost stops, as a timestamp - Home Assistant renders it as a live countdown ("in 15 minutes"). Unavailable while no boost is running |
+| `sensor` | `<room> Boost ends` | When that room's running boost stops, as a timestamp - Home Assistant renders it as a live countdown ("in 15 minutes"). Unknown while no boost is running |
 | `sensor` | `<room> Nominal airflow` | That room's rated reference airflow in m³/h - diagnostic entity |
 | `sensor` | `<room> Valve pressure` | Differential pressure across that room's valve, Pa - diagnostic entity, requires an active API key |
 | `sensor` | `<room> Duct conductance` | That room's duct conductance - diagnostic entity, requires an active API key; see [Duct model](#duct-model) |

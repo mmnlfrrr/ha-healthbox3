@@ -773,10 +773,17 @@ async def test_boost_end_sensor_counts_down_and_holds_steady(
     assert hass.states.get(entity_id).state == first
 
 
-async def test_boost_end_sensor_is_unavailable_when_no_boost_is_running(
+async def test_boost_end_sensor_is_unknown_not_unavailable_when_idle(
     hass, mock_api_client, v1_data
 ):
-    """There is no end time for something that is not going to end."""
+    """There is no end time for something that is not going to end - but
+    that is not a fault, and must not be reported as one.
+
+    `unavailable` means this integration cannot get the data, and Home
+    Assistant puts an error marker against it in the entity list. The
+    device answered perfectly here; it said there is no boost. That is
+    `unknown`.
+    """
     await setup_integration(
         hass,
         mock_api_client,
@@ -789,4 +796,4 @@ async def test_boost_end_sensor_is_unavailable_when_no_boost_is_running(
     entity_id = er.async_get(hass).async_get_entity_id(
         "sensor", DOMAIN, f"{v1_data.serial}_room1_boost_end"
     )
-    assert hass.states.get(entity_id).state == "unavailable"
+    assert hass.states.get(entity_id).state == "unknown"

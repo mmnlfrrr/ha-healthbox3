@@ -182,8 +182,15 @@ class Healthbox3RoomBoostEndSensor(Healthbox3Entity, SensorEntity):
     counting between polls, where a seconds-remaining number would sit
     still for fifteen of them and then jump.
 
-    Unavailable while no boost is running: there is no end time for
-    something that is not going to end.
+    Unknown while no boost is running, not unavailable. The difference
+    matters: unavailable means this integration cannot get the data, and
+    Home Assistant flags it with an error in the entity list. Nothing is
+    wrong when no boost is running - the device answered perfectly, and
+    what it said is that there is nothing to count down. That is exactly
+    what `unknown` is for.
+
+    Unavailable is kept for the case it describes: the room's boost
+    status could not be read at all.
     """
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
@@ -207,8 +214,8 @@ class Healthbox3RoomBoostEndSensor(Healthbox3Entity, SensorEntity):
     @property
     @override
     def available(self) -> bool:
-        """Return whether a boost is currently running in this room."""
-        return super().available and self.native_value is not None
+        """Return whether this room's boost status could be read at all."""
+        return super().available and self._room_id in self.coordinator.data.boost
 
     @property
     @override

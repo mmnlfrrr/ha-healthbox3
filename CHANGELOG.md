@@ -269,9 +269,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   *timestamp* rather than the seconds the device counts down in: that is
   what Home Assistant renders as a live countdown, so a tile reads "in
   15 minutes" and keeps ticking between polls, where a seconds figure
-  would sit still for fifteen of them and then jump. Unavailable while
-  no boost is running - there is no end time for something that is not
-  going to end.
+  would sit still for fifteen of them and then jump.
+
+  Unknown while no boost is running, not unavailable: unavailable means
+  the integration cannot get the data, and Home Assistant marks such an
+  entity with an error in the entity list. Nothing is wrong when no
+  boost is running - the device answered, and what it said is that there
+  is nothing to count down. Unavailable is kept for the case it
+  describes, a room whose boost status could not be read at all.
 - **Diagnostics per device, not only per integration.** The Download
   diagnostics button on a room's device page now answers with that room
   only: its parsed state, boost status, staged boost level and duration,
